@@ -2,7 +2,7 @@
 
 **Describe a site. Forge it live.**
 
-A free, open-source AI website builder that runs entirely in your browser. Chat what you want — or use the Prompt Builder — and WebForge generates a multi-file React + Tailwind app with an instant sandboxed preview.
+A free, open-source AI website builder that runs entirely in your browser. Chat what you want — or use the **Prompt Wizard** — and WebForge generates a multi-file React + Tailwind app with an instant sandboxed preview.
 
 No backend. Your API keys and projects stay on your device.
 
@@ -23,6 +23,29 @@ No backend. Your API keys and projects stay on your device.
 | **Live preview** | Babel + Tailwind in a sandboxed iframe, right in the browser |
 | **Your model** | OpenRouter, LM Studio, Ollama, or any OpenAI-compatible API |
 | **Skills** | Toggleable system-prompt extensions for security, a11y, polish, and more |
+| **Prompt Wizard** | Multi-step guided brief that turns picks into a detailed AI prompt |
+
+---
+
+## Prompt Wizard
+
+Not sure how to describe a site? Open **Prompt Builder** from the dashboard or chat. The wizard walks you through a structured brief and builds a ready-to-use prompt — paste it into WebForge chat, or copy it for ChatGPT, Claude, or any LLM.
+
+<p align="center">
+  <img src="docs/assets/webforge-prompt-wizard.png" alt="WebForge Prompt Wizard — choose site type, colors, and get a generated AI prompt" width="900" />
+</p>
+
+<p align="center"><em>Prompt Wizard — pick type & style, get a production-ready prompt.</em></p>
+
+### How it works
+
+1. **Type** — Choose the niche (business, restaurant, portfolio, photography, SaaS, non-profit, and more).
+2. **Style & colors** — Pick a visual direction and a curated palette (with smart suggestions per style).
+3. **Layout & content** — Set header, hero, sections, tone, and site details.
+4. **Features** — Toggle interactions (mobile menu, smooth scroll, animations, forms, and more).
+5. **Prompt** — Get a scored, copy-ready brief covering layout, interactions, and responsive requirements.
+
+Skip any optional step. When you’re done, send the prompt into WebForge to generate the site, or use it elsewhere.
 
 ---
 
@@ -60,7 +83,7 @@ Import custom skills from GitHub (`AGENTS.md` / `README.md`) and toggle any mix 
 ## Features at a glance
 
 - Chat-driven generation and surgical follow-up edits  
-- Prompt Builder for structured site briefs  
+- **Prompt Wizard** — guided 7-step brief (type → style → colors → layout → content → features → prompt)  
 - Multi-project dashboard with export (ZIP / static HTML)  
 - Live sandboxed preview (React, Tailwind CDN, Lucide)  
 - Skill dock + Settings for temperature, max tokens, and model load  
