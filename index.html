@@ -108,7 +108,8 @@
             <textarea id="chatInput" placeholder="Ask WebForge to build or edit the app… (Enter to Send)" rows="1" autocomplete="off" oninput="autoGrow(this)"></textarea>
             <div class="composer-actions">
               <button class="chip" onclick="openPromptBuilderModal()"><i data-lucide="sparkles"></i> Build a prompt</button>
-              <button class="chip btn-danger hidden" id="btnAutoFix" onclick="triggerAutoFix()" style="background:var(--primary-soft);border-color:var(--primary);color:var(--primary)"><i data-lucide="sparkles"></i> Auto-Fix (0)</button>
+              <button class="chip chip-autofix" id="btnAutoFix" onclick="triggerAutoFix()" title="Verify preview and auto-fix errors"><i data-lucide="wrench"></i> Verify &amp; Fix</button>
+              <button class="chip chip-retry hidden" id="btnRetryGen" onclick="retryLastGeneration()" title="Retry after connection failure"><i data-lucide="rotate-cw"></i> Retry</button>
               <div class="spacer"></div>
               <span class="status-text" id="statusInfo">Ready</span>
               <button class="send-btn" id="chatSend" title="Send"><i data-lucide="send"></i></button>

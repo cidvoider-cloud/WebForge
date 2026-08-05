@@ -160,14 +160,20 @@ class PreviewManager {
   renderErrorIndicator() {
     const btn = document.getElementById('btnAutoFix');
     if (!btn) return;
-    if (this.activeErrors.length > 0) {
-      btn.innerHTML = `<i data-lucide="sparkles"></i> Auto-Fix (${this.activeErrors.length})`;
+    const count = this.activeErrors.length;
+    if (count > 0) {
+      btn.innerHTML = `<i data-lucide="wrench"></i> Auto-Fix (${count})`;
+      btn.classList.add('has-errors');
       btn.classList.remove('hidden');
-      if (typeof lucide !== 'undefined') {
+    } else {
+      btn.innerHTML = `<i data-lucide="wrench"></i> Verify &amp; Fix`;
+      btn.classList.remove('has-errors');
+      btn.classList.remove('hidden');
+    }
+    if (typeof lucide !== 'undefined') {
+      try { lucide.createIcons({ root: btn }); } catch {
         try { lucide.createIcons(); } catch {}
       }
-    } else {
-      btn.classList.add('hidden');
     }
   }
 

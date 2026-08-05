@@ -11,6 +11,16 @@ let activeFilePath = '';
 let isGenerating = false;
 let skillsDockOpen = false;
 
+const GEN_JOB_KEY = 'wf_active_gen';
+const LAST_PROJECT_KEY = 'wf_last_project';
+const GEN_JOB_MAX_AGE_MS = 45 * 60 * 1000;
+let _activeGenJob = null;
+let _genCheckpointTimer = null;
+let _userStoppedGeneration = false;
+let _lastFailedJob = null;
+let _postGenVerifyTimer = null;
+let _autoFixInFlight = false;
+
 // â”€â”€ Boilerplate React Project â”€â”€
 const DEFAULT_VFS = {
   'src/main.jsx': `import React from 'react';
@@ -128,6 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
   promptBuilder = new PromptBuilder();
   window.promptBuilder = promptBuilder;
   preview = new PreviewManager();
+  preview.renderErrorIndicator?.();
 
   // Load Projects
   _loadProjects();
@@ -167,6 +178,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize Lucide icons
   safeCreateIcons();
+
+  // Persist in-flight generation so a refresh can resume it
+  window.addEventListener('pagehide', _flushGenCheckpoint);
+  window.addEventListener('beforeunload', _onBeforeUnloadDuringGen);
+
+  // Restore last project / resume interrupted generation
+  requestAnimationFrame(() => _tryRestoreSession());
 });
 
 // ── Home / Workspace View Toggle ──
@@ -305,6 +323,7 @@ function _renderFileTree() {
     const parts = path.split('/');
     const name = parts[parts.length - 1];
     const indent = (parts.length - 1) * 12;
+    const safePath = path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     
     let icon = '<i data-lucide="file-text" style="width:12px;height:12px;display:inline-block;vertical-align:middle"></i>';
     if (path.endsWith('.css')) {
@@ -316,8 +335,8 @@ function _renderFileTree() {
     }
     
     return `
-      <div class="file-item ${isActive ? 'active' : ''}" style="padding-left: ${14 + indent}px" onclick="_openFile('${path}')">
-        <span>${icon}</span> ${name}
+      <div class="file-item ${isActive ? 'active' : ''}" style="padding-left: ${14 + indent}px" data-path="${escapeHtml(path)}" onclick="_openFile('${safePath}')">
+        <span>${icon}</span> ${escapeHtml(name)}
       </div>
     `;
   }).join('');
@@ -445,6 +464,7 @@ function openProject(projectId) {
   activeProjectId = projectId;
   proj.updatedAt = Date.now();
   _saveProjects();
+  try { localStorage.setItem(LAST_PROJECT_KEY, projectId); } catch {}
   
   const titleEl = document.getElementById('workspaceProjectTitle');
   if (titleEl) titleEl.textContent = proj.name;
@@ -484,6 +504,18 @@ function openProject(projectId) {
   switchWorkspaceView('preview');
   _updateRevertButtonState();
   showWorkspaceView();
+
+  const pendingJob = _loadGenJob();
+  const canRetry = pendingJob
+    && pendingJob.projectId === projectId
+    && pendingJob.userMessage
+    && pendingJob.status === 'running';
+  if (canRetry) {
+    _lastFailedJob = pendingJob;
+    _setRetryAvailable(true);
+  } else {
+    _setRetryAvailable(false);
+  }
 }
 
 function _saveChatHistory() {
@@ -762,42 +794,216 @@ function _setupChatBar() {
   });
 }
 
-async function sendChatMessage() {
+/** Persist generation job so refresh can resume the same prompt */
+function _saveGenJob(patch = {}) {
+  if (!_activeGenJob && !patch.projectId && !patch.userMessage) return;
+  _activeGenJob = {
+    ...(_activeGenJob || {}),
+    ...patch,
+    updatedAt: Date.now(),
+  };
+  try {
+    localStorage.setItem(GEN_JOB_KEY, JSON.stringify(_activeGenJob));
+  } catch {
+    try {
+      const slim = {
+        ..._activeGenJob,
+        streamedCode: String(_activeGenJob.streamedCode || '').slice(-80000),
+        userContent: String(_activeGenJob.userContent || '').slice(0, 120000),
+      };
+      localStorage.setItem(GEN_JOB_KEY, JSON.stringify(slim));
+      _activeGenJob = slim;
+    } catch { /* storage full — VFS mid-stream saves still help */ }
+  }
+}
+
+function _clearGenJob() {
+  _activeGenJob = null;
+  if (_genCheckpointTimer) {
+    clearTimeout(_genCheckpointTimer);
+    _genCheckpointTimer = null;
+  }
+  try { localStorage.removeItem(GEN_JOB_KEY); } catch {}
+}
+
+function _loadGenJob() {
+  try {
+    return JSON.parse(localStorage.getItem(GEN_JOB_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function _scheduleGenCheckpoint(streamedCode) {
+  if (_genCheckpointTimer) return;
+  _genCheckpointTimer = setTimeout(() => {
+    _genCheckpointTimer = null;
+    if (!isGenerating || !_activeGenJob) return;
+    _saveGenJob({ streamedCode, status: 'running' });
+    _saveVFS();
+    _saveChatHistory();
+  }, 450);
+}
+
+function _flushGenCheckpoint() {
+  if (!isGenerating || !_activeGenJob) return;
+  if (_genCheckpointTimer) {
+    clearTimeout(_genCheckpointTimer);
+    _genCheckpointTimer = null;
+  }
+  _saveGenJob({ status: 'running', interruptedAt: Date.now() });
+  _saveVFS();
+  _saveChatHistory();
+}
+
+function _onBeforeUnloadDuringGen(e) {
+  if (!isGenerating) return;
+  _flushGenCheckpoint();
+  e.preventDefault();
+  e.returnValue = '';
+}
+
+function _buildResumeUserContent(job) {
+  const base = job.userContent || `User instruction:\n${job.userMessage}`;
+  const partial = String(job.streamedCode || '').trim();
+  const filesSoFar = Object.keys(VFS).sort().join(', ') || '(none yet)';
+  if (!partial) {
+    return [
+      base,
+      '',
+      'NOTE: The previous generation attempt was interrupted by a browser refresh before any output arrived. Start the task now and output complete file blocks.'
+    ].join('\n');
+  }
+  return [
+    base,
+    '',
+    'IMPORTANT — Generation was interrupted by a page refresh. Continue and COMPLETE the remaining work.',
+    'Do NOT restart the whole app from scratch unless required.',
+    `Files already saved in the project VFS: ${filesSoFar}`,
+    'Output ONLY remaining or incomplete files as complete ### FILE: blocks (full file contents).',
+    'If the last file in the partial output below was cut off, rewrite that entire file completely, then finish any remaining files.',
+    '',
+    'Partial model output received before refresh:',
+    '-----',
+    partial.slice(-70000),
+    '-----'
+  ].join('\n');
+}
+
+function _markInterruptedGenCards(root, { preparingResume = false } = {}) {
+  if (!root) return;
+  root.querySelectorAll('.gen-status-card:not(.done)').forEach(card => {
+    const title = card.querySelector('#genStatusTitle');
+    if (title) title.textContent = preparingResume ? 'Resuming after refresh…' : 'Interrupted by refresh';
+    card.querySelectorAll('.lucide-spin').forEach(el => el.classList.remove('lucide-spin'));
+    const orb = card.querySelector('.gen-orb');
+    if (orb && !preparingResume) {
+      orb.style.animation = 'none';
+      orb.style.background = 'var(--text-dim)';
+      orb.style.boxShadow = 'none';
+    }
+    const headerIcon = card.querySelector('.gen-status-header > i, .gen-status-header > svg');
+    if (headerIcon && !orb) {
+      headerIcon.outerHTML = preparingResume
+        ? '<div class="gen-orb" aria-hidden="true"></div>'
+        : '<i data-lucide="alert-circle"></i>';
+    }
+    if (!preparingResume && !card.querySelector('.gen-interrupted-note')) {
+      card.insertAdjacentHTML('beforeend',
+        '<div class="gen-interrupted-note">Generation stopped when the page reloaded. Send the prompt again or wait if auto-resume is running.</div>');
+    }
+  });
+  safeCreateIcons(root);
+}
+
+function _tryRestoreSession() {
+  const job = _loadGenJob();
+  const jobFresh = job
+    && job.status === 'running'
+    && job.projectId
+    && job.userMessage
+    && (Date.now() - (job.updatedAt || job.startedAt || 0)) < GEN_JOB_MAX_AGE_MS
+    && projectsList.some(p => p.id === job.projectId);
+
+  if (jobFresh) {
+    if ((job.resumeCount || 0) >= 3) {
+      _clearGenJob();
+      openProject(job.projectId);
+      _markInterruptedGenCards(document.getElementById('chatMessages'), { preparingResume: false });
+      showToast('Could not finish generation after several resumes. Please send the prompt again.', true);
+      return;
+    }
+    openProject(job.projectId);
+    _markInterruptedGenCards(document.getElementById('chatMessages'), { preparingResume: true });
+    showToast('Resuming generation after refresh…');
+    setTimeout(() => sendChatMessage({ resumeJob: job }), 120);
+    return;
+  }
+
+  if (job?.status === 'running') {
+    _clearGenJob();
+  }
+
+  let lastId = null;
+  try { lastId = localStorage.getItem(LAST_PROJECT_KEY); } catch {}
+  if (lastId && projectsList.some(p => p.id === lastId)) {
+    // Stay on home unless user had an interrupted spinner — clean those when they open the project
+  }
+}
+
+async function sendChatMessage(options = {}) {
+  const resumeJob = options.resumeJob || null;
   const input = document.getElementById('chatInput');
-  const msg = (input?.value || '').trim();
+  const msg = resumeJob ? String(resumeJob.userMessage || '').trim() : (input?.value || '').trim();
   if (!msg || isGenerating) return;
 
   // Ensure we have a project
   if (!activeProjectId) {
-    createNewProject();
+    if (resumeJob?.projectId && projectsList.some(p => p.id === resumeJob.projectId)) {
+      openProject(resumeJob.projectId);
+    } else {
+      createNewProject();
+    }
   }
 
-  // Save VFS version history before this generation changes it
-  saveVFSHistory();
+  const isResume = !!resumeJob;
+  if (!isResume) {
+    // Save VFS version history before this generation changes it
+    saveVFSHistory();
 
-  const escapedMsg = msg.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  _addMessageBubble('user', escapedMsg);
-  _saveChatHistory();
-  input.value = '';
-  input.style.height = 'auto';
+    const escapedMsg = msg.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    _addMessageBubble('user', escapedMsg, { rawText: msg });
+    _saveChatHistory();
+    input.value = '';
+    input.style.height = 'auto';
+    _setRetryAvailable(false);
+  } else if (resumeJob.historyBefore) {
+    conversationHistory = Array.isArray(resumeJob.historyBefore)
+      ? resumeJob.historyBefore.slice()
+      : conversationHistory;
+  }
 
   // Declare variables that need to be accessible in catch/finally block
   let aiBubbleId = null;
 
   try {
     isGenerating = true;
+    _userStoppedGeneration = false;
     _updateGeneratingUI(true);
     
-    preview.showLoader('AI is building...', 'Streaming files and writing React code...');
+    preview.showLoader(
+      isResume ? 'Resuming generation…' : 'AI is building...',
+      isResume ? 'Restoring cached progress and continuing…' : 'Streaming files and writing React code...'
+    );
     
     const elementCtx = preview.getSelectedElementContext();
     const systemPrompt = skillManager.getSystemPrompt();
-    const hasUserAskedBefore = conversationHistory.some(m => m.role === 'user');
+    const hasUserAskedBefore = conversationHistory.some(m => m.role === 'user') || isResume;
     const requestMode = classifyRequestMode(msg, hasUserAskedBefore, preview.activeErrors || []);
     const fileContext = buildFileContext(msg, requestMode);
     const projectSummary = getProjectSummary();
     const modeInstructions = buildModeInstructions(requestMode);
-    const userContent = [
+    let userContent = [
       elementCtx,
       projectSummary ? `Current project summary:\n${projectSummary}` : '',
       hasUserAskedBefore ? `Here is the current codebase:\n\n${fileContext}` : `Here is the initial file system boilerplate you MUST build on top of:\n\n${fileContext}`,
@@ -806,23 +1012,69 @@ async function sendChatMessage() {
       'Output valid complete file blocks only when code changes are needed. Use valid JavaScript string literals and escape quotes/newlines inside strings so Babel can compile the preview.'
     ].filter(Boolean).join('\n\n');
 
+    if (isResume) {
+      userContent = _buildResumeUserContent({
+        ...resumeJob,
+        userContent: resumeJob.userContent || userContent,
+        userMessage: msg,
+        streamedCode: resumeJob.streamedCode || '',
+      });
+    }
+
     const initialHtml = `
       <div class="gen-status-card" id="genStatusCard">
         <div class="gen-status-header">
-          <i data-lucide="loader-2" class="lucide-spin"></i>
-          <span id="genStatusTitle">Thinking...</span>
+          <div class="gen-orb" aria-hidden="true"></div>
+          <span class="gen-status-title" id="genStatusTitle">${isResume ? 'Resuming…' : 'Crafting your app…'}</span>
+          <span class="gen-status-meta" id="genStatusMeta">live</span>
         </div>
         <div id="genStepsContainer">
           <div class="gen-step done" id="step-analyze">
-            <span class="icon-wrapper"><i data-lucide="check-circle-2"></i></span>
-            <span>Analyzing prompt and context</span>
+            <span class="icon-wrapper"><i data-lucide="check"></i></span>
+            <span class="gen-step-label">${isResume ? 'Restored cached progress' : 'Analyzed prompt & context'}</span>
           </div>
         </div>
       </div>
     `;
-    aiBubbleId = _addMessageBubble('ai', initialHtml);
+
+    if (isResume) {
+      // Replace the last incomplete AI status card instead of stacking duplicates
+      const chatMsgs = document.getElementById('chatMessages');
+      const stale = chatMsgs?.querySelector('.gen-status-card:not(.done)')?.closest('.msg.ai');
+      if (stale) {
+        aiBubbleId = stale.id || ('msg-' + Date.now());
+        stale.id = aiBubbleId;
+        const bubble = stale.querySelector('.bubble');
+        if (bubble) {
+          bubble.innerHTML = `<span class="name">WebForge</span><div class="message-content ai-content">${initialHtml}</div>`;
+          safeCreateIcons(bubble);
+        }
+      } else {
+        aiBubbleId = _addMessageBubble('ai', initialHtml);
+      }
+    } else {
+      aiBubbleId = _addMessageBubble('ai', initialHtml);
+    }
+
     let processedFiles = new Set();
+    if (isResume) {
+      getParsedFilePaths(resumeJob.streamedCode || '', { includePartial: false }).forEach(p => processedFiles.add(p));
+    }
     _saveChatHistory();
+
+    _activeGenJob = {
+      id: resumeJob?.id || _generateId(),
+      projectId: activeProjectId,
+      userMessage: msg,
+      userContent,
+      streamedCode: resumeJob?.streamedCode || '',
+      status: 'running',
+      startedAt: resumeJob?.startedAt || Date.now(),
+      historyBefore: resumeJob?.historyBefore || conversationHistory.slice(),
+      resumeCount: (resumeJob?.resumeCount || 0) + (isResume ? 1 : 0),
+      aiBubbleId,
+    };
+    _saveGenJob(_activeGenJob);
 
     const startTime = Date.now();
     let streamedCode = '';
@@ -832,39 +1084,44 @@ async function sendChatMessage() {
       userContent,
       (chunk, full) => {
         streamedCode = full;
+        if (_activeGenJob) _activeGenJob.streamedCode = full;
         
         const updatedVFS = parseStreamedVFS(full, VFS, { includePartial: false });
         Object.assign(VFS, updatedVFS);
         
         _saveVFS();
         _renderFileTree();
+        _scheduleGenCheckpoint(full);
         
         const currentFileWrite = _detectActiveWritingFile(full);
         if (currentFileWrite) {
           preview.showLoader('AI is building...', `Writing: ${currentFileWrite}...`);
+          const titleEl = document.getElementById('genStatusTitle');
+          if (titleEl) titleEl.textContent = 'Writing files…';
+          const metaEl = document.getElementById('genStatusMeta');
+          if (metaEl) metaEl.textContent = `${processedFiles.size || 1} file${processedFiles.size === 1 ? '' : 's'}`;
           
           if (!processedFiles.has(currentFileWrite)) {
             processedFiles.add(currentFileWrite);
             const stepsContainer = document.getElementById('genStepsContainer');
             if (stepsContainer) {
+              // Mark previous active/incomplete steps as done
+              stepsContainer.querySelectorAll('.gen-step:not(.done)').forEach(prev => {
+                prev.classList.remove('active');
+                prev.classList.add('done');
+                const iconWrap = prev.querySelector('.icon-wrapper');
+                if (iconWrap) iconWrap.innerHTML = '<i data-lucide="check"></i>';
+              });
+
               const stepHtml = `
-                <div class="gen-step">
-                  <span class="icon-wrapper"><i data-lucide="circle"></i></span>
-                  <span>Writing <code>${currentFileWrite}</code>...</span>
+                <div class="gen-step active">
+                  <span class="icon-wrapper"><span class="gen-step-dot"></span></span>
+                  <span class="gen-step-label">Writing <span class="gen-file-pill">${escapeHtml(currentFileWrite)}</span></span>
                 </div>
               `;
               stepsContainer.insertAdjacentHTML('beforeend', stepHtml);
               if (typeof lucide !== 'undefined') safeCreateIcons(stepsContainer);
-              
-              // Mark previous steps as done
-              const steps = stepsContainer.querySelectorAll('.gen-step');
-              if (steps.length > 1) {
-                const prev = steps[steps.length - 2];
-                prev.classList.add('done');
-                const iconWrap = prev.querySelector('.icon-wrapper');
-                if (iconWrap) iconWrap.innerHTML = '<i data-lucide="check-circle-2"></i>';
-                if (typeof lucide !== 'undefined') safeCreateIcons(iconWrap);
-              }
+              if (metaEl) metaEl.textContent = `${processedFiles.size} file${processedFiles.size === 1 ? '' : 's'}`;
             }
           }
         }
@@ -873,6 +1130,7 @@ async function sendChatMessage() {
           const editor = document.getElementById('codeEditor');
           if (editor && document.activeElement !== editor) {
             editor.value = updatedVFS[activeFilePath];
+            updateCodeHighlight();
           }
         }
 
@@ -886,6 +1144,7 @@ async function sendChatMessage() {
     let finalPaths = getParsedFilePaths(streamedCode, { includePartial: false });
     if (!finalPaths.length && requestMode !== 'DISCUSS') {
       preview.showLoader('Repairing AI output...', 'Asking the model to return complete file blocks...');
+      _saveGenJob({ streamedCode, status: 'running', repairing: true });
       streamedCode = await repairMalformedOutput(systemPrompt, userContent, streamedCode);
       finalPaths = getParsedFilePaths(streamedCode, { includePartial: false });
     }
@@ -900,6 +1159,7 @@ async function sendChatMessage() {
           { role: 'assistant', content: streamedCode }
         );
         _saveChatHistory();
+        _clearGenJob();
         _updateStatusBar({ tokens: Math.ceil(streamedCode.length / 4), time: ((Date.now() - startTime) / 1000).toFixed(1), done: true });
         preview.hideLoader();
         return;
@@ -924,35 +1184,34 @@ async function sendChatMessage() {
       // Mark all remaining steps as done
       const stepsContainer = bubbleEl.querySelector('#genStepsContainer');
       if (stepsContainer) {
-        const steps = stepsContainer.querySelectorAll('.gen-step');
-        if (steps.length > 0) {
-          const last = steps[steps.length - 1];
-          last.classList.add('done');
-          const iconWrap = last.querySelector('.icon-wrapper');
-          if (iconWrap) iconWrap.innerHTML = '<i data-lucide="check-circle-2"></i>';
-        }
+        stepsContainer.querySelectorAll('.gen-step').forEach(step => {
+          step.classList.remove('active');
+          step.classList.add('done');
+          const iconWrap = step.querySelector('.icon-wrapper');
+          if (iconWrap) iconWrap.innerHTML = '<i data-lucide="check"></i>';
+        });
       }
       
       const headerTitle = bubbleEl.querySelector('#genStatusTitle');
-      if (headerTitle) headerTitle.textContent = 'Generation Complete';
-      const headerIcon = bubbleEl.querySelector('.gen-status-header i');
-      if (headerIcon) {
-        headerIcon.outerHTML = '<i data-lucide="check-circle-2"></i>';
-      }
+      if (headerTitle) headerTitle.textContent = 'App ready';
+      const metaEl = bubbleEl.querySelector('#genStatusMeta');
+      if (metaEl) metaEl.textContent = `${finalPaths.length} file${finalPaths.length === 1 ? '' : 's'}`;
+      const orb = bubbleEl.querySelector('.gen-orb');
+      if (orb) orb.classList.add('done');
       bubbleEl.querySelector('#genStatusCard')?.classList.add('done');
       bubbleEl.querySelectorAll('.lucide-spin').forEach(el => el.classList.remove('lucide-spin'));
       
-      const filesList = finalPaths.map(p => `<code>${escapeHtml(p)}</code>`).join(', ');
+      const filesList = finalPaths.map(p => `<span class="gen-file-pill">${escapeHtml(p)}</span>`).join(' ');
       const doneHtml = `
-        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
-          <span class="name">WebForge</span>
-          <div style="margin-top: 4px;">Done. Updated: ${filesList || 'project files'}. Check the preview!</div>
+        <div class="gen-done-summary">
+          <div class="gen-done-copy">Updated ${filesList || 'project files'}. Preview is live.</div>
         </div>
       `;
       bubbleEl.querySelector('.bubble').insertAdjacentHTML('beforeend', doneHtml);
       if (typeof lucide !== 'undefined') safeCreateIcons(bubbleEl);
     }
     _saveChatHistory();
+    _clearGenJob();
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     _updateStatusBar({ tokens: Math.ceil(streamedCode.length / 4), time: elapsed, done: true });
@@ -961,22 +1220,63 @@ async function sendChatMessage() {
     preview.hideLoader();
     
     switchWorkspaceView('preview');
-    showToast('App compiled successfully! ðŸš€');
+    showToast('App compiled successfully!');
+    _setRetryAvailable(false);
+    _schedulePostGenVerify();
 
   } catch (e) {
     preview.hideLoader();
+    const isConn = _isConnectionError(e);
     if (aiBubbleId) {
       const bubbleEl = document.getElementById(aiBubbleId);
       if (bubbleEl) {
+        const retryHint = (!_userStoppedGeneration)
+          ? `<div class="msg-action-row">
+              <button type="button" class="msg-action-btn msg-retry-btn" onclick="retryLastGeneration()">
+                <i data-lucide="rotate-cw"></i> ${isConn ? 'Retry connection' : 'Retry generation'}
+              </button>
+            </div>`
+          : '';
         bubbleEl.querySelector('.bubble').innerHTML = `<span class="name">WebForge</span>
-          <span style="color:var(--danger)"><strong>Error:</strong> ${e.message}</span>`;
+          <div class="gen-error-card">
+            <strong>${isConn ? 'Connection broken' : 'Error'}</strong>
+            <span>${escapeHtml(e.message)}</span>
+            ${retryHint}
+          </div>`;
+        safeCreateIcons(bubbleEl);
       }
     }
     _saveChatHistory();
-    if (e.name !== 'AbortError') showToast('Error: ' + e.message, true);
+    if (e.name === 'AbortError') {
+      if (_userStoppedGeneration) {
+        // stopGeneration already staged Retry from the checkpoint
+        if (!_lastFailedJob?.userMessage) {
+          _clearGenJob();
+          _setRetryAvailable(false);
+        }
+      } else {
+        // Page refresh/unload aborted the fetch — keep checkpoint for auto-resume
+        _flushGenCheckpoint();
+      }
+    } else {
+      // Keep a resumable checkpoint so refresh / Retry can continue
+      _lastFailedJob = {
+        ...(_activeGenJob || {}),
+        status: 'running',
+        streamedCode: (_activeGenJob && _activeGenJob.streamedCode) || '',
+        error: e.message,
+        userMessage: msg,
+        projectId: activeProjectId,
+        updatedAt: Date.now(),
+      };
+      _saveGenJob(_lastFailedJob);
+      _setRetryAvailable(true);
+      showToast((isConn ? 'Connection broken — tap Retry' : 'Error: ') + (isConn ? '' : e.message), true);
+    }
   } finally {
     isGenerating = false;
     _updateGeneratingUI(false);
+    _autoFixInFlight = false;
   }
 }
 
@@ -1180,16 +1480,30 @@ function _detectActiveWritingFile(text) {
   return null;
 }
 
-function _addMessageBubble(role, contentHtml) {
+function _addMessageBubble(role, contentHtml, opts = {}) {
   const container = document.getElementById('chatMessages');
   if (!container) return null;
 
-  const bubbleId = 'msg-' + Date.now();
+  const bubbleId = 'msg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
   const bodyHtml = typeof contentHtml === 'string' ? contentHtml.trim() : contentHtml;
   const div = document.createElement('div');
   div.className = `msg ${role}`;
   div.id = bubbleId;
-  div.innerHTML = `<div class="avatar">${role === 'user' ? '<i data-lucide="user"></i>' : '<i data-lucide="cat"></i>'}</div><div class="bubble"><span class="name">${role === 'user' ? 'You' : 'WebForge'}</span><div class="message-content ${role}-content">${bodyHtml}</div></div>`;
+
+  const copyBtn = (role === 'user' && opts.rawText)
+    ? `<button type="button" class="msg-action-btn msg-copy-btn" title="Copy prompt" onclick="copyMessagePrompt('${bubbleId}')"><i data-lucide="copy"></i> Copy</button>`
+    : '';
+
+  div.innerHTML = `<div class="avatar">${role === 'user' ? '<i data-lucide="user"></i>' : '<i data-lucide="cat"></i>'}</div><div class="bubble"><div class="msg-head"><span class="name">${role === 'user' ? 'You' : 'WebForge'}</span>${copyBtn}</div><div class="message-content ${role}-content">${bodyHtml}</div></div>`;
+
+  if (role === 'user' && opts.rawText) {
+    try {
+      div.dataset.prompt = encodeURIComponent(opts.rawText);
+    } catch {
+      div.dataset.prompt = '';
+    }
+  }
+
   container.appendChild(div);
   if (typeof lucide !== 'undefined') {
     safeCreateIcons(div);
@@ -1198,24 +1512,206 @@ function _addMessageBubble(role, contentHtml) {
   return bubbleId;
 }
 
-function _normalizeSavedChatUI(root) {
-  root.querySelectorAll('.gen-status-card').forEach(card => {
-    const title = card.querySelector('#genStatusTitle');
-    if (title?.textContent.trim() === 'Generation Complete') {
-      card.classList.add('done');
-      const headerIcon = card.querySelector('.gen-status-header svg, .gen-status-header i');
-      if (headerIcon) headerIcon.outerHTML = '<i data-lucide="check-circle-2"></i>';
-      card.querySelectorAll('.lucide-spin').forEach(el => el.classList.remove('lucide-spin'));
+async function copyMessagePrompt(bubbleId) {
+  const el = document.getElementById(bubbleId);
+  if (!el) return showToast('Message not found', true);
+  let text = '';
+  try {
+    text = decodeURIComponent(el.dataset.prompt || '');
+  } catch {
+    text = '';
+  }
+  if (!text) {
+    text = el.querySelector('.message-content')?.innerText?.trim() || '';
+  }
+  if (!text) return showToast('Nothing to copy', true);
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const fallback = document.createElement('textarea');
+    fallback.value = text;
+    fallback.setAttribute('readonly', '');
+    fallback.style.position = 'fixed';
+    fallback.style.opacity = '0';
+    document.body.appendChild(fallback);
+    fallback.select();
+    document.execCommand('copy');
+    fallback.remove();
+  }
+  showToast('Prompt copied');
+}
+
+function _isConnectionError(err) {
+  const msg = String(err?.message || err || '').toLowerCase();
+  const name = String(err?.name || '');
+  if (name === 'TypeError' && /fetch|network|failed/i.test(msg)) return true;
+  return /failed to fetch|networkerror|network request failed|load failed|connection|timed out|timeout|econnreset|econnrefused|socket|offline|api error (429|500|502|503|504)/i.test(msg);
+}
+
+function _setRetryAvailable(show) {
+  const btn = document.getElementById('btnRetryGen');
+  if (!btn) return;
+  btn.classList.toggle('hidden', !show);
+  if (show) safeCreateIcons(btn);
+}
+
+function retryLastGeneration() {
+  if (isGenerating) return showToast('Already generating…');
+  const job = _loadGenJob() || _lastFailedJob;
+  if (!job?.userMessage || !job.projectId) {
+    return showToast('Nothing to retry', true);
+  }
+  if (job.projectId !== activeProjectId) {
+    openProject(job.projectId);
+  }
+  showToast('Retrying generation…');
+  _setRetryAvailable(false);
+  sendChatMessage({
+    resumeJob: {
+      ...job,
+      status: 'running',
+      resumeCount: (job.resumeCount || 0),
     }
   });
 }
 
+function _schedulePostGenVerify() {
+  if (_postGenVerifyTimer) clearTimeout(_postGenVerifyTimer);
+  _postGenVerifyTimer = setTimeout(() => {
+    _postGenVerifyTimer = null;
+    if (isGenerating || _autoFixInFlight) return;
+    const errors = preview.activeErrors || [];
+    if (errors.length) {
+      showToast(`Preview has ${errors.length} error${errors.length === 1 ? '' : 's'} — Auto-Fixing…`);
+      triggerAutoFix({ silent: true });
+      return;
+    }
+    const staticIssues = _collectStaticProjectIssues();
+    if (staticIssues.length) {
+      showToast('Found project issues — Auto-Fixing…');
+      triggerAutoFix({ silent: true, staticIssues });
+    }
+  }, 1600);
+}
+
+function _collectStaticProjectIssues() {
+  const issues = [];
+  if (!VFS['src/App.jsx']) issues.push('Missing required file: src/App.jsx');
+  if (!VFS['src/main.jsx']) issues.push('Missing required file: src/main.jsx');
+
+  const importRe = /import\s+(?:[\s\S]*?)\s+from\s+['"](\.[^'"]+)['"]/g;
+  const exists = (resolved) => {
+    const candidates = [
+      resolved,
+      resolved + '.jsx',
+      resolved + '.js',
+      resolved + '.css',
+      resolved + '/index.jsx',
+      resolved + '/index.js',
+    ];
+    return candidates.some(c => VFS[c]);
+  };
+
+  for (const [path, code] of Object.entries(VFS)) {
+    if (!/\.(jsx?|tsx?)$/i.test(path)) continue;
+    let match;
+    const src = String(code || '');
+    importRe.lastIndex = 0;
+    while ((match = importRe.exec(src)) !== null) {
+      const resolved = _resolveVfsImport(path, match[1]);
+      if (resolved && !exists(resolved)) {
+        issues.push(`Broken import in ${path}: "${match[1]}" (file not found)`);
+      }
+    }
+  }
+  return [...new Set(issues)].slice(0, 12);
+}
+
+function _resolveVfsImport(fromPath, spec) {
+  const parts = fromPath.split('/');
+  parts.pop();
+  const segs = String(spec).split('/');
+  for (const seg of segs) {
+    if (seg === '.' || seg === '') continue;
+    if (seg === '..') parts.pop();
+    else parts.push(seg);
+  }
+  return parts.join('/');
+}
+
+function _normalizeSavedChatUI(root) {
+  root.querySelectorAll('.gen-status-card').forEach(card => {
+    const title = card.querySelector('#genStatusTitle');
+    const titleText = title?.textContent.trim() || '';
+    if (titleText === 'Generation Complete' || titleText === 'App ready') {
+      card.classList.add('done');
+      card.querySelectorAll('.lucide-spin').forEach(el => el.classList.remove('lucide-spin'));
+    } else if (!card.classList.contains('done')) {
+      // Incomplete spinner from a prior session — mark interrupted unless we're about to resume
+      const job = _loadGenJob();
+      const willResume = job
+        && job.status === 'running'
+        && job.projectId === activeProjectId
+        && (Date.now() - (job.updatedAt || 0)) < GEN_JOB_MAX_AGE_MS;
+      if (!willResume) {
+        if (title) title.textContent = 'Interrupted by refresh';
+        card.querySelectorAll('.lucide-spin').forEach(el => el.classList.remove('lucide-spin'));
+        const orb = card.querySelector('.gen-orb');
+        if (orb) {
+          orb.style.animation = 'none';
+          orb.style.background = 'var(--text-dim)';
+          orb.style.boxShadow = 'none';
+        }
+      }
+    }
+  });
+
+  // Ensure older user messages get a Copy prompt action
+  root.querySelectorAll('.msg.user').forEach(msg => {
+    if (msg.querySelector('.msg-copy-btn')) return;
+    const bubble = msg.querySelector('.bubble');
+    if (!bubble) return;
+    let head = bubble.querySelector('.msg-head');
+    const nameEl = bubble.querySelector('.name');
+    if (!head && nameEl) {
+      head = document.createElement('div');
+      head.className = 'msg-head';
+      nameEl.replaceWith(head);
+      head.appendChild(nameEl);
+    }
+    if (!head) return;
+    if (!msg.id) msg.id = 'msg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+    if (!msg.dataset.prompt) {
+      const text = msg.querySelector('.message-content')?.innerText?.trim() || '';
+      if (text) msg.dataset.prompt = encodeURIComponent(text);
+    }
+    head.insertAdjacentHTML('beforeend',
+      `<button type="button" class="msg-action-btn msg-copy-btn" title="Copy prompt" onclick="copyMessagePrompt('${msg.id}')"><i data-lucide="copy"></i> Copy</button>`);
+  });
+}
+
 function stopGeneration() {
+  _userStoppedGeneration = true;
   provider.stop();
   isGenerating = false;
   _updateGeneratingUI(false);
   preview.hideLoader();
   preview.flushStream();
+  // Keep checkpoint so user can still Retry if they want
+  if (_activeGenJob?.userMessage) {
+    _lastFailedJob = { ..._activeGenJob, status: 'running', updatedAt: Date.now() };
+    _saveGenJob(_lastFailedJob);
+    _setRetryAvailable(true);
+  } else {
+    _clearGenJob();
+    _setRetryAvailable(false);
+  }
+  const chatMsgs = document.getElementById('chatMessages');
+  _markInterruptedGenCards(chatMsgs, { preparingResume: false });
+  const note = chatMsgs?.querySelector('.gen-interrupted-note');
+  if (note) note.textContent = 'Generation stopped. Use Retry to continue.';
+  _saveChatHistory();
 }
 
 function _updateGeneratingUI(generating) {
@@ -1379,6 +1875,7 @@ function switchWorkspaceView(view) {
   const filesBtn = document.getElementById('btnViewFiles');
   const previewFrame = document.getElementById('previewFrameWrap');
   const codeView = document.getElementById('viewport-files');
+  const stage = document.querySelector('.ws-stage');
   
   if (previewBtn) previewBtn.classList.toggle('active', view === 'preview');
   if (filesBtn) filesBtn.classList.toggle('active', view === 'files');
@@ -1386,16 +1883,24 @@ function switchWorkspaceView(view) {
   if (view === 'preview') {
     if (previewFrame) previewFrame.classList.remove('hide');
     if (codeView) codeView.classList.remove('show');
+    if (stage) stage.classList.remove('code-mode');
   } else {
     if (previewFrame) previewFrame.classList.add('hide');
     if (codeView) codeView.classList.add('show');
+    if (stage) stage.classList.add('code-mode');
   }
   
   const devBtns = document.getElementById('previewDeviceBtns');
   if (devBtns) devBtns.style.display = view === 'preview' ? 'flex' : 'none';
   
-  if (view === 'files' && activeFilePath) {
-    _openFile(activeFilePath, false);
+  if (view === 'files') {
+    _renderFileTree();
+    if (activeFilePath && VFS[activeFilePath]) {
+      _openFile(activeFilePath, false);
+    } else {
+      const first = Object.keys(VFS).sort()[0];
+      if (first) _openFile(first, false);
+    }
   }
 }
 
@@ -1629,22 +2134,55 @@ function _updateRevertButtonState() {
 
 // â”€â”€ Auto-Fix System â”€â”€
 
-function triggerAutoFix() {
-  if (!preview.activeErrors || preview.activeErrors.length === 0) {
-    showToast('No active errors to fix!');
+function triggerAutoFix(opts = {}) {
+  if (isGenerating) {
+    if (!opts.silent) showToast('Wait for the current generation to finish');
     return;
   }
-  
-  const debugContext = preview.getDebugContext ? preview.getDebugContext() : preview.activeErrors.map(err => {
+
+  const errors = preview.activeErrors || [];
+  const staticIssues = opts.staticIssues || _collectStaticProjectIssues();
+  const debugContext = preview.getDebugContext ? preview.getDebugContext() : errors.map(err => {
     return `[${err.title}]\n${err.message}\n${err.stack || ''}`;
   }).join('\n\n');
-  
-  const prompt = `DEBUG MODE: The preview has the following diagnostics:\n\n${debugContext}\n\nFix the root cause with the smallest targeted patch. Do not regenerate the whole project. Output only complete changed or newly created files.`;
-  
+
+  if (!errors.length && !staticIssues.length && !debugContext.trim()) {
+    // Soft verify: ask the model to sanity-check and only patch if needed
+    if (!opts.silent) {
+      const chatInput = document.getElementById('chatInput');
+      const prompt = [
+        'VERIFY & FIX MODE: Inspect the current project and make sure the website works in the WebForge preview.',
+        'Check for missing imports, invalid JSX, broken Lucide icons, runtime crashes, and layout issues.',
+        'If everything already works, reply briefly with no file blocks.',
+        'If something is broken, fix the root cause with the smallest targeted patch. Output only complete changed/new files.',
+        'Do not regenerate the whole project.'
+      ].join('\n');
+      if (chatInput) {
+        chatInput.value = prompt;
+        autoGrow(chatInput);
+        _autoFixInFlight = true;
+        sendChatMessage();
+      }
+    } else {
+      showToast('Preview looks healthy');
+    }
+    return;
+  }
+
+  const parts = [
+    'DEBUG MODE: Make sure the website works in the WebForge preview.',
+    'Fix the root cause with the smallest targeted patch. Do not regenerate the whole project.',
+    'Output only complete changed or newly created files.',
+  ];
+  if (debugContext.trim()) parts.push('', 'Preview diagnostics:', debugContext);
+  if (staticIssues.length) parts.push('', 'Static checks:', staticIssues.map(i => `- ${i}`).join('\n'));
+
+  const prompt = parts.join('\n');
   const chatInput = document.getElementById('chatInput');
   if (chatInput) {
     chatInput.value = prompt;
     autoGrow(chatInput);
+    _autoFixInFlight = true;
     sendChatMessage();
   }
 }

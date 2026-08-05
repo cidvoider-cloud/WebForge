@@ -781,6 +781,14 @@ OUTPUT RULES:
       this.showToast("No prompt to send to chat!");
       return;
     }
+
+    // Ensure a workspace project exists (Prompt Builder can open from Home)
+    if (typeof activeProjectId !== 'undefined' && !activeProjectId && typeof createNewProject === 'function') {
+      createNewProject();
+    } else if (typeof showWorkspaceView === 'function') {
+      showWorkspaceView();
+    }
+
     const input = document.getElementById("chatInput");
     if (input) {
       input.value = text;
@@ -789,7 +797,14 @@ OUTPUT RULES:
       input.focus();
     }
     document.getElementById("promptBuilderModal")?.close();
-    this.showToast("Prompt copied to composer!");
+
+    // Auto-send so the built prompt actually starts generation
+    if (typeof sendChatMessage === 'function') {
+      requestAnimationFrame(() => sendChatMessage());
+      this.showToast("Prompt sent to WebForge!");
+    } else {
+      this.showToast("Prompt copied to composer!");
+    }
   }
 
   setPromptHeight(h) {
