@@ -179,12 +179,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialize Lucide icons
   safeCreateIcons();
 
-  // Persist in-flight generation so a refresh can resume it
+  // Persist in-flight generation so a refresh can resume via Retry
   window.addEventListener('pagehide', _flushGenCheckpoint);
   window.addEventListener('beforeunload', _onBeforeUnloadDuringGen);
 
-  // Restore last project / resume interrupted generation
-  requestAnimationFrame(() => _tryRestoreSession());
+  // Always start on Home (never auto-open a previous project)
+  showHomeView();
+  requestAnimationFrame(() => _ensureHomeOnLaunch());
 });
 
 // ── Home / Workspace View Toggle ──
@@ -929,7 +930,11 @@ function _markInterruptedGenCards(root, { preparingResume = false } = {}) {
   safeCreateIcons(root);
 }
 
-function _tryRestoreSession() {
+function _ensureHomeOnLaunch() {
+  // Hard guarantee: app launch always shows Home, never a past project workspace
+  showHomeView();
+  _setRetryAvailable(false);
+
   const job = _loadGenJob();
   const jobFresh = job
     && job.status === 'running'
@@ -941,26 +946,21 @@ function _tryRestoreSession() {
   if (jobFresh) {
     if ((job.resumeCount || 0) >= 3) {
       _clearGenJob();
-      openProject(job.projectId);
-      _markInterruptedGenCards(document.getElementById('chatMessages'), { preparingResume: false });
-      showToast('Could not finish generation after several resumes. Please send the prompt again.', true);
       return;
     }
-    openProject(job.projectId);
-    _markInterruptedGenCards(document.getElementById('chatMessages'), { preparingResume: true });
-    showToast('Resuming generation after refresh…');
-    setTimeout(() => sendChatMessage({ resumeJob: job }), 120);
+    // Keep checkpoint for Retry, but do not auto-enter the project
+    _lastFailedJob = job;
+    const proj = projectsList.find(p => p.id === job.projectId);
+    showToast(
+      proj
+        ? `Unfinished generation in “${proj.name}” — open it and tap Retry`
+        : 'Unfinished generation saved — open the project and tap Retry'
+    );
     return;
   }
 
   if (job?.status === 'running') {
     _clearGenJob();
-  }
-
-  let lastId = null;
-  try { lastId = localStorage.getItem(LAST_PROJECT_KEY); } catch {}
-  if (lastId && projectsList.some(p => p.id === lastId)) {
-    // Stay on home unless user had an interrupted spinner — clean those when they open the project
   }
 }
 
