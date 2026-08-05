@@ -1,5 +1,5 @@
 /**
- * WebForge AI â€” Main Application Controller (v4 â€” Forge UI)
+ * WebForge - Main Application Controller (v4 - Forge UI)
  * Handles Virtual File System (VFS), AI chat, multi-project management,
  * prompt builder slide-over, and workspace view switching.
  */
@@ -50,7 +50,7 @@ export default function App() {
         </button>
       </div>
       <footer className="mt-8 text-center text-xs text-slate-600">
-        WebForge AI Â· Pure Client-side Sandbox
+        WebForge Â· Pure Client-side Sandbox
       </footer>
     </div>
   );
@@ -473,7 +473,7 @@ function openProject(projectId) {
       chatMsgs.innerHTML = `
         <div class="msg ai">
           <div class="avatar"><i data-lucide="cat"></i></div>
-          <div class="bubble"><span class="name">WebForge AI</span>
+          <div class="bubble"><span class="name">WebForge</span>
             Workspace <strong>${proj.name}</strong> loaded. What would you like to build?
           </div>
         </div>`;
@@ -893,7 +893,7 @@ async function sendChatMessage() {
       if (requestMode === 'DISCUSS') {
         const bubbleEl = document.getElementById(aiBubbleId);
         if (bubbleEl) {
-          bubbleEl.querySelector('.bubble').innerHTML = `<span class="name">WebForge AI</span><div class="message-content">${escapeHtml(streamedCode || 'No code changes needed.')}</div>`;
+          bubbleEl.querySelector('.bubble').innerHTML = `<span class="name">WebForge</span><div class="message-content">${escapeHtml(streamedCode || 'No code changes needed.')}</div>`;
         }
         conversationHistory.push(
           { role: 'user', content: msg },
@@ -945,7 +945,7 @@ async function sendChatMessage() {
       const filesList = finalPaths.map(p => `<code>${escapeHtml(p)}</code>`).join(', ');
       const doneHtml = `
         <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
-          <span class="name">WebForge AI</span>
+          <span class="name">WebForge</span>
           <div style="margin-top: 4px;">Done. Updated: ${filesList || 'project files'}. Check the preview!</div>
         </div>
       `;
@@ -968,7 +968,7 @@ async function sendChatMessage() {
     if (aiBubbleId) {
       const bubbleEl = document.getElementById(aiBubbleId);
       if (bubbleEl) {
-        bubbleEl.querySelector('.bubble').innerHTML = `<span class="name">WebForge AI</span>
+        bubbleEl.querySelector('.bubble').innerHTML = `<span class="name">WebForge</span>
           <span style="color:var(--danger)"><strong>Error:</strong> ${e.message}</span>`;
       }
     }
@@ -1189,7 +1189,7 @@ function _addMessageBubble(role, contentHtml) {
   const div = document.createElement('div');
   div.className = `msg ${role}`;
   div.id = bubbleId;
-  div.innerHTML = `<div class="avatar">${role === 'user' ? '<i data-lucide="user"></i>' : '<i data-lucide="cat"></i>'}</div><div class="bubble"><span class="name">${role === 'user' ? 'You' : 'WebForge AI'}</span><div class="message-content ${role}-content">${bodyHtml}</div></div>`;
+  div.innerHTML = `<div class="avatar">${role === 'user' ? '<i data-lucide="user"></i>' : '<i data-lucide="cat"></i>'}</div><div class="bubble"><span class="name">${role === 'user' ? 'You' : 'WebForge'}</span><div class="message-content ${role}-content">${bodyHtml}</div></div>`;
   container.appendChild(div);
   if (typeof lucide !== 'undefined') {
     safeCreateIcons(div);

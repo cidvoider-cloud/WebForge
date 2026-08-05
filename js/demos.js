@@ -1,5 +1,5 @@
 /**
- * WebForge AI — Built-in demo projects (flora / cute / stylish)
+ * WebForge — Built-in demo projects (flora / cute / stylish)
  * Seeded into localStorage once so the home dashboard isn't empty.
  */
 

@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 cd /d "%~dp0"
-title ForgeMySite Launcher
+title WebForge Launcher
 
 set "PORT=8000"
 set "URL=http://127.0.0.1:%PORT%/index.html"
@@ -11,7 +11,7 @@ set "SERVER_MODE="
 
 echo.
 echo  ========================================
-echo   ForgeMySite — dependency check
+echo   WebForge — dependency check
 echo  ========================================
 echo.
 
@@ -123,9 +123,9 @@ echo.
 
 REM Start server in background, wait until ready, then open browser
 if /i "%SERVER_MODE%"=="python" (
-  start "ForgeMySite Server" /Min cmd /c "%PYTHON_CMD% -m http.server %PORT% --bind 127.0.0.1"
+  start "WebForge Server" /Min cmd /c "%PYTHON_CMD% -m http.server %PORT% --bind 127.0.0.1"
 ) else (
-  start "ForgeMySite Server" /Min cmd /c "node tools\serve.mjs %PORT%"
+  start "WebForge Server" /Min cmd /c "node tools\serve.mjs %PORT%"
 )
 
 call :wait_for_server
@@ -137,8 +137,8 @@ if errorlevel 1 (
 echo  [OK] Server is ready
 start "" "%URL%"
 echo.
-echo  Browser opened. Keep the server window open while you use ForgeMySite.
-echo  This window can be closed; stop the app via the minimized "ForgeMySite Server" window.
+echo  Browser opened. Keep the server window open while you use WebForge.
+echo  This window can be closed; stop the app via the minimized "WebForge Server" window.
 echo.
 pause
 exit /b 0

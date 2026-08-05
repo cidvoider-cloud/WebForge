@@ -1,5 +1,5 @@
 /**
- * Zero-dependency static file server for ForgeMySite.
+ * Zero-dependency static file server for WebForge.
  * Usage: node tools/serve.mjs [port]
  */
 import http from 'http';
@@ -69,7 +69,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(port, '127.0.0.1', () => {
-  console.log(`ForgeMySite serving ${root}`);
+  console.log(`WebForge serving ${root}`);
   console.log(`Open http://127.0.0.1:${port}/index.html`);
 });
 

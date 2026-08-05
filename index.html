@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WebForge AI - AI Website Builder</title>
-  <meta name="description" content="Build structured React applications with AI. Configure LLMs, utilize prompt builders, and interact with live preview.">
+  <title>WebForge — AI Website Builder</title>
+  <meta name="description" content="WebForge is a free, open-source AI website builder that runs in your browser. Chat a prompt, get a live React site preview.">
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/prompt-builder.css">
   <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
@@ -34,9 +34,9 @@
     <main class="home-main">
       <div class="home-hero">
         <h1 class="home-hero-title">What's on your mind?</h1>
-        <p class="home-hero-sub">Describe what you want to build and WebForge AI will create it.</p>
+        <p class="home-hero-sub">Describe what you want to build and WebForge will create it.</p>
         <div class="home-prompt-box">
-          <textarea id="homePromptInput" placeholder="Ask WebForge to create a website about.." rows="1" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+          <textarea id="homePromptInput" placeholder="Ask WebForge to create a website about…" rows="1" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
           <div class="home-prompt-actions">
             <button class="home-prompt-btn" onclick="openPromptBuilderModal()"><i data-lucide="sparkles"></i> Prompt Builder</button>
             <div class="spacer"></div>
@@ -91,7 +91,7 @@
         <div class="chat-body" id="chatMessages">
           <div class="msg ai">
             <div class="avatar"><i data-lucide="cat"></i></div>
-            <div class="bubble"><span class="name">WebForge AI</span>
+            <div class="bubble"><span class="name">WebForge</span>
               Hello! I'm your AI developer. Tell me what you want to build, or use <strong>Prompt Builder</strong> to craft a detailed prompt.
             </div>
           </div>
@@ -105,7 +105,7 @@
         <!-- Composer -->
         <div class="composer">
           <div class="composer-box">
-            <textarea id="chatInput" placeholder="Ask WebForge to build or edit the app... (Enter to Send)" rows="1" autocomplete="off" oninput="autoGrow(this)"></textarea>
+            <textarea id="chatInput" placeholder="Ask WebForge to build or edit the app… (Enter to Send)" rows="1" autocomplete="off" oninput="autoGrow(this)"></textarea>
             <div class="composer-actions">
               <button class="chip" onclick="openPromptBuilderModal()"><i data-lucide="sparkles"></i> Build a prompt</button>
               <button class="chip btn-danger hidden" id="btnAutoFix" onclick="triggerAutoFix()" style="background:var(--primary-soft);border-color:var(--primary);color:var(--primary)"><i data-lucide="sparkles"></i> Auto-Fix (0)</button>
@@ -197,7 +197,7 @@
   <!-- ============ PROMPT BUILDER DIALOG MODAL ============ -->
   <dialog id="promptBuilderModal">
     <div class="modal-header">
-      <h2><i data-lucide="wand-sparkles"></i> WebForge AI Website Prompt Wizard</h2>
+      <h2><i data-lucide="wand-sparkles"></i> WebForge Prompt Wizard</h2>
       <button class="modal-close" type="button" aria-label="Close wizard" onclick="this.closest('dialog').close()"><i data-lucide="x"></i></button>
     </div>
     <div class="modal-body">

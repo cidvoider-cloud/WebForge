@@ -1,5 +1,5 @@
 /**
- * WebForge AI â€” Lovable-Style Live Preview (v3)
+ * WebForge — Lovable-Style Live Preview (v3)
  * Handles in-browser Babel compilation of React + Tailwind + Lucide React in VFS project files.
  */
 

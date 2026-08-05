@@ -31,7 +31,7 @@ No backend. Your API keys and projects stay on your device.
 Tune how the AI writes code with built-in **Skills**, and run everything against a local model when you want privacy and control.
 
 <p align="center">
-  <img src="docs/assets/webforge-skills-local-llm.png" alt="WebForge AI & Skills settings with LM Studio and skill toggles" width="900" />
+  <img src="docs/assets/webforge-skills-local-llm.png" alt="WebForge settings with LM Studio and skill toggles" width="900" />
 </p>
 
 <p align="center"><em>Build with a local LLM — Skills shape every generation.</em></p>

@@ -1,11 +1,11 @@
 ﻿/**
- * WebForge AI - Skill System + Base System Prompt (v3)
+ * WebForge - Skill System + Base System Prompt (v3)
  * Skills are system-prompt extensions the user can toggle.
  * Base prompt instructs the AI to build multi-file React/Tailwind/Lucide apps in VFS format.
  */
 
 /** Base system prompt - forces multi-file React & Tailwind block format */
-const BASE_SYSTEM_PROMPT = `You are WebForge AI, a senior React developer. You build modern, beautiful, and fully functional React applications styled with Tailwind CSS and Lucide React icons.
+const BASE_SYSTEM_PROMPT = `You are WebForge, a senior React developer. You build modern, beautiful, and fully functional React applications styled with Tailwind CSS and Lucide React icons.
 
 ## APP STRUCTURE & FILES
 You must structure the application into clean, modular components. A typical app should have:

@@ -1,5 +1,5 @@
 /**
- * WebForge AI - Prompt Builder
+ * WebForge - Prompt Builder
  * 7-step wizard that builds a detailed site prompt from user selections.
  */
 

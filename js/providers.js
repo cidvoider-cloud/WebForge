@@ -1,5 +1,5 @@
 /**
- * WebForge AI — AI Provider System
+ * WebForge — AI Provider System
  * Handles OpenRouter, LM Studio, Ollama, and custom OpenAI-compatible APIs.
  * One class, four providers, streaming everywhere.
  */
@@ -74,7 +74,7 @@ class AIProvider {
     if (this.apiKey) h['Authorization'] = `Bearer ${this.apiKey}`;
     if (this.type === 'openrouter') {
       h['HTTP-Referer'] = location.href;
-      h['X-Title'] = 'WebForge AI';
+      h['X-Title'] = 'WebForge';
     }
     return h;
   }

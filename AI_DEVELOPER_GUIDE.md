@@ -1,4 +1,4 @@
-# WebForge AI — Architecture Guide
+# WebForge — Architecture Guide
 
 Static vanilla HTML/CSS/JS app. No build tools, no npm, no bundler. Serve with `python -m http.server 8000` or `start.bat`.
 
