@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebForge AI - AI Website Builder</title>
+  <meta name="description" content="Build structured React applications with AI. Configure LLMs, utilize prompt builders, and interact with live preview.">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/prompt-builder.css">
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23ff5c38'/%3E%3Ctext x='50' y='63' text-anchor='middle' font-size='42' fill='white'%3EW%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+
+  <!-- ============ HOME DASHBOARD ============ -->
+  <div id="homeView" class="home-view">
+    <aside class="home-sidebar">
+      <div class="home-sidebar-brand">
+        <div class="logo"><i data-lucide="cat"></i></div>
+        <span>WebForge</span>
+      </div>
+      <nav class="home-nav">
+        <button class="home-nav-item active"><i data-lucide="layout-dashboard"></i> Dashboard</button>
+        <button class="home-nav-item" onclick="document.getElementById('settingsModal').showModal()"><i data-lucide="settings"></i> Settings</button>
+      </nav>
+      <div class="home-nav-section">Projects</div>
+      <div class="home-nav-projects" id="homeSidebarProjects">
+        <!-- Injected by JS -->
+      </div>
+      <div class="home-sidebar-footer">
+        <button class="home-nav-item" onclick="createNewProjectFromHome()"><i data-lucide="plus"></i> New Project</button>
+      </div>
+    </aside>
+    <main class="home-main">
+      <div class="home-hero">
+        <h1 class="home-hero-title">What's on your mind?</h1>
+        <p class="home-hero-sub">Describe what you want to build and WebForge AI will create it.</p>
+        <div class="home-prompt-box">
+          <textarea id="homePromptInput" placeholder="Ask WebForge to create a website about.." rows="1" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+          <div class="home-prompt-actions">
+            <button class="home-prompt-btn" onclick="openPromptBuilderModal()"><i data-lucide="sparkles"></i> Prompt Builder</button>
+            <div class="spacer"></div>
+            <button class="home-send-btn" id="homeSendBtn" onclick="sendHomePrompt()"><i data-lucide="arrow-up"></i></button>
+          </div>
+        </div>
+      </div>
+      <div class="home-projects-section">
+        <div class="home-projects-header">
+          <h2>My Projects</h2>
+          <button class="home-browse-btn" onclick="createNewProjectFromHome()"><i data-lucide="plus"></i> New</button>
+        </div>
+        <div class="home-projects-grid" id="homeProjectsGrid">
+          <!-- Injected by JS -->
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="app" id="workspaceView" style="display:none">
+
+    <!-- ============ TOP BAR ============ -->
+    <header class="topbar">
+      <div class="brand" onclick="showHomeView()" style="cursor:pointer" title="Back to Dashboard"><div class="logo"><i data-lucide="cat"></i></div> WebForge</div>
+
+      <!-- Project Selector Dropdown -->
+      <div class="project-selector">
+        <div class="project-name" id="projectNameBtn" onclick="toggleProjectDropdown()">
+          <span class="dot"></span>
+          <span id="activeProjectName">No Project</span>
+          <span class="chevron"><i data-lucide="chevron-down"></i></span>
+        </div>
+        <div class="project-dropdown" id="projectDropdown">
+          <div class="project-dropdown-header">My Projects</div>
+          <div id="sidebarProjectsList">
+            <!-- Injected by app.js -->
+          </div>
+          <button class="project-dropdown-item new-project" onclick="createNewProject(); toggleProjectDropdown();">+ New Project</button>
+        </div>
+      </div>
+
+      <div class="topbar-spacer"></div>
+
+      <button class="btn btn-ghost" onclick="openPromptBuilderModal()"><i data-lucide="stars"></i> Prompt Builder</button>
+      <button class="btn btn-outline" onclick="exportAsZip()"><i data-lucide="archive"></i> Export</button>
+      <button class="btn btn-outline" onclick="document.getElementById('settingsModal').showModal()"><i data-lucide="settings"></i> Settings</button>
+    </header>
+
+    <div class="main">
+      <!-- ============ LEFT: CHAT ============ -->
+      <aside class="chat">
+        <div class="chat-body" id="chatMessages">
+          <div class="msg ai">
+            <div class="avatar"><i data-lucide="cat"></i></div>
+            <div class="bubble"><span class="name">WebForge AI</span>
+              Hello! I'm your AI developer. Tell me what you want to build, or use <strong>Prompt Builder</strong> to craft a detailed prompt.
+            </div>
+          </div>
+        </div>
+
+        <!-- Active Skills Mini Indicators -->
+        <div class="skills-row" id="skillsIndicatorRow">
+          <!-- Injected by app.js -->
+        </div>
+
+        <!-- Composer -->
+        <div class="composer">
+          <div class="composer-box">
+            <textarea id="chatInput" placeholder="Ask WebForge to build or edit the app... (Enter to Send)" rows="1" autocomplete="off" oninput="autoGrow(this)"></textarea>
+            <div class="composer-actions">
+              <button class="chip" onclick="openPromptBuilderModal()"><i data-lucide="sparkles"></i> Build a prompt</button>
+              <button class="chip btn-danger hidden" id="btnAutoFix" onclick="triggerAutoFix()" style="background:var(--primary-soft);border-color:var(--primary);color:var(--primary)"><i data-lucide="sparkles"></i> Auto-Fix (0)</button>
+              <div class="spacer"></div>
+              <span class="status-text" id="statusInfo">Ready</span>
+              <button class="send-btn" id="chatSend" title="Send"><i data-lucide="send"></i></button>
+              <button class="stop-btn" id="btnStop" style="display:none" onclick="stopGeneration()" title="Stop"><i data-lucide="stop-circle"></i></button>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- ============ RIGHT: WORKSPACE ============ -->
+      <section class="workspace">
+        <div class="ws-toolbar">
+          <div class="seg">
+            <button class="active" id="btnViewPreview" onclick="switchWorkspaceView('preview')">Preview</button>
+            <button id="btnViewFiles" onclick="switchWorkspaceView('files')">Code</button>
+          </div>
+          <div class="url-bar"><i data-lucide="lock" style="width:12px;height:12px;margin-right:4px"></i> localhost <span style="color:var(--text-dim)">/ <span id="workspaceProjectTitle">project</span></span></div>
+          <div class="spacer"></div>
+          <div class="device-btns" id="previewDeviceBtns">
+            <button class="device-btn active" data-device="desktop" title="Desktop"><i data-lucide="monitor"></i></button>
+            <button class="device-btn" data-device="tablet" title="Tablet"><i data-lucide="tablet"></i></button>
+            <button class="device-btn" data-device="mobile" title="Mobile"><i data-lucide="smartphone"></i></button>
+          </div>
+          <button class="btn-icon" onclick="refreshPreview()" title="Refresh"><i data-lucide="refresh-cw"></i></button>
+          <button class="btn-icon" onclick="openPreviewNewTab()" title="Open in new tab"><i data-lucide="external-link"></i></button>
+          <button class="btn-icon" onclick="exportAsHTML()" title="Download HTML"><i data-lucide="download"></i></button>
+        </div>
+
+        <div class="ws-stage">
+          <!-- LIVE PREVIEW -->
+          <div class="preview-frame" id="previewFrameWrap">
+            <!-- Compilation loader overlay -->
+            <div class="preview-loader hidden" id="previewLoader" style="background:var(--bg-panel); z-index: 10;">
+              <div class="preview-skeleton-wrapper">
+                <div class="skeleton-block skeleton-nav"></div>
+                <div class="skeleton-block skeleton-hero"></div>
+                <div class="skeleton-grid">
+                  <div class="skeleton-block skeleton-card"></div>
+                  <div class="skeleton-block skeleton-card"></div>
+                  <div class="skeleton-block skeleton-card"></div>
+                </div>
+                <div style="position: absolute; bottom: 20px; right: 20px; display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 13px;">
+                  <i data-lucide="loader-2" class="lucide-spin"></i>
+                  <span id="loaderTitle" style="font-weight: 600; color: var(--text);">Compiling...</span>
+                  <span id="loaderMessage">Building React modules...</span>
+                </div>
+              </div>
+            </div>
+            <iframe id="previewFrame" sandbox="allow-scripts allow-same-origin" style="width:100%;height:100%;border:none;min-height:calc(100vh - 160px)"></iframe>
+          </div>
+
+          <!-- CODE VIEW -->
+          <div class="code-view" id="viewport-files">
+            <div class="code-split">
+              <!-- File Explorer -->
+              <div class="code-sidebar">
+                <div class="code-sidebar-head">
+                  Files
+                  <div style="display:flex;gap:4px">
+                    <button class="btn-icon" onclick="revertVFS()" id="btnRevertVFS" title="Revert to Previous Version" style="width:24px;height:24px" disabled><i data-lucide="history"></i></button>
+                    <button class="btn-icon" onclick="resetProjectVFS()" title="Reset Project" style="width:24px;height:24px"><i data-lucide="rotate-ccw"></i></button>
+                  </div>
+                </div>
+                <div class="file-tree" id="fileTree">
+                  <!-- Injected by app.js -->
+                </div>
+              </div>
+              <!-- Code Editor -->
+              <div class="code-editor-area">
+                <div class="code-editor-head">
+                  <span id="activeFileName">src/App.jsx</span>
+                  <button class="btn-icon" onclick="copyCode()" title="Copy Code" style="width:24px;height:24px"><i data-lucide="copy"></i></button>
+                </div>
+                <div class="code-editor-shell">
+                  <pre class="code-highlight" id="codeHighlight" aria-hidden="true"></pre>
+                  <textarea class="code-textarea" id="codeEditor" spellcheck="false" placeholder="// Select a file from the explorer to view/edit..."></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ============ PROMPT BUILDER DIALOG MODAL ============ -->
+  <dialog id="promptBuilderModal">
+    <div class="modal-header">
+      <h2><i data-lucide="wand-sparkles"></i> WebForge AI Website Prompt Wizard</h2>
+      <button class="modal-close" type="button" aria-label="Close wizard" onclick="this.closest('dialog').close()"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="view-prompt-builder" id="viewPromptBuilder">
+        <div class="step-panel active" data-step="1">
+        <div class="step-header"><h2 class="step-title">What type of website?</h2><span class="step-counter" id="stepCounter">Step 1 of 7</span></div>
+        <p class="step-description">Choose the category that best matches your project.</p>
+
+        <div id="typeGrid">
+            <div class="style-group">
+                <div class="style-group-label">Services &amp; Business</div>
+                <div class="card-grid horizontal">
+                    <div class="select-card" data-value="Business / Corporate" onclick="selectCard(this,&#39;type&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="building-2"></i></span><div class="card-content"><div class="card-title">Business</div><div class="card-desc">Corporate, agency, consulting</div></div></div>
+                    <div class="select-card" data-value="Restaurant / Cafe" onclick="selectCard(this,&#39;type&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="utensils"></i></span><div class="card-content"><div class="card-title">Restaurant</div><div class="card-desc">Cafe, bakery, food business</div></div></div>
+                    <div class="select-card" data-value="Real Estate / Property" onclick="selectCard(this,&#39;type&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="home"></i></span><div class="card-content"><div class="card-title">Real Estate</div><div class="card-desc">Property, listings, agency</div></div></div>
+                    <div class="select-card" data-value="Health / Wellness" onclick="selectCard(this,&#39;type&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="heart-pulse"></i></span><div class="card-content"><div class="card-title">Health / Wellness</div><div class="card-desc">Spa, fitness, medical</div></div></div>
+                    <div class="select-card" data-value="Law / Legal Services" onclick="selectCard(this,&#39;type&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="scale"></i></span><div class="card-content"><div class="card-title">Law / Legal</div><div class="card-desc">Attorney, law firm, legal</div></div></div>
+                    <div class="select-card" data-value="Gym / Fitness Studio" onclick="selectCard(this,&#39;type&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="dumbbell"></i></span><div class="card-content"><div class="card-title">Gym / Fitness</div><div class="card-desc">Training, sports, wellness</div></div></div>
+                </div>
+            </div>
+            <div class="style-group">
+                <div class="style-group-label">Creative &amp; Personal</div>
+                <div class="card-grid horizontal">
+                    <div class="select-card" data-value="Portfolio / Personal" onclick="selectCard(this,&#39;type&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="briefcase"></i></span><div class="card-content"><div class="card-title">Portfolio</div><div class="card-desc">Personal, creative showcase</div></div></div>
+                    <div class="select-card" data-value="Photography / Gallery" onclick="selectCard(this,&#39;type&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="camera"></i></span><div class="card-content"><div class="card-title">Photography</div><div class="card-desc">Gallery, visual portfolio</div></div></div>
+                    <div class="select-card" data-value="Blog / Magazine" onclick="selectCard(this,&#39;type&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="newspaper"></i></span><div class="card-content"><div class="card-title">Blog / Magazine</div><div class="card-desc">Content, news, articles</div></div></div>
+                    <div class="select-card" data-value="Music / Band" onclick="selectCard(this,&#39;type&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="music"></i></span><div class="card-content"><div class="card-title">Music / Band</div><div class="card-desc">Artist, band, music studio</div></div></div>
+                    <div class="select-card" data-value="Wedding / Celebration" onclick="selectCard(this,&#39;type&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="sparkles"></i></span><div class="card-content"><div class="card-title">Wedding</div><div class="card-desc">Celebration, invitation, planner</div></div></div>
+                    <div class="select-card" data-value="Travel / Tourism" onclick="selectCard(this,&#39;type&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="plane"></i></span><div class="card-content"><div class="card-title">Travel</div><div class="card-desc">Tourism, booking, guides</div></div></div>
+                </div>
+            </div>
+            <div class="style-group">
+                <div class="style-group-label">Commerce &amp; Community</div>
+                <div class="card-grid horizontal">
+                    <div class="select-card" data-value="SaaS / Landing Page" onclick="selectCard(this,&#39;type&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="rocket"></i></span><div class="card-content"><div class="card-title">SaaS / Landing</div><div class="card-desc">Product, startup, app landing</div></div></div>
+                    <div class="select-card" data-value="E-Commerce / Online Store" onclick="selectCard(this,&#39;type&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="shopping-bag"></i></span><div class="card-content"><div class="card-title">E-Commerce</div><div class="card-desc">Online store, product catalog</div></div></div>
+                    <div class="select-card" data-value="Education / Course" onclick="selectCard(this,&#39;type&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="graduation-cap"></i></span><div class="card-content"><div class="card-title">Education</div><div class="card-desc">Course, school, e-learning</div></div></div>
+                    <div class="select-card" data-value="Event / Conference" onclick="selectCard(this,&#39;type&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="calendar"></i></span><div class="card-content"><div class="card-title">Event</div><div class="card-desc">Conference, meetup, festival</div></div></div>
+                    <div class="select-card" data-value="Non-Profit / Charity" onclick="selectCard(this,&#39;type&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="heart"></i></span><div class="card-content"><div class="card-title">Non-Profit</div><div class="card-desc">Charity, NGO, cause</div></div></div>
+                    <div class="select-card" data-value="Church / Religious Organization" onclick="selectCard(this,&#39;type&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="church"></i></span><div class="card-content"><div class="card-title">Church</div><div class="card-desc">Religious, community, ministry</div></div></div>
+                </div>
+            </div>
+        </div>
+        <div class="validation-nudge" id="typeNudge" role="alert">Please select a website type to continue.</div>
+    </div>
+
+    <!-- Step 2: Style -->
+    <div class="step-panel" data-step="2">
+        <div class="step-header"><h2 class="step-title">Pick a design style</h2><span class="step-counter">Step 2 of 7</span></div>
+        <p class="step-description">Select the overall aesthetic direction for your website.</p>
+        <div id="styleGrid">
+            <div class="style-group">
+                <div class="style-group-label">Clean &amp; Structured</div>
+                <div class="card-grid horizontal">
+                    <div class="select-card" data-value="Minimalist and Clean" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="square"></i></span><div class="card-content"><div class="card-title">Minimalist</div><div class="card-desc">Clean, whitespace, elegant</div></div></div>
+                    <div class="select-card" data-value="Corporate and Professional" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="briefcase"></i></span><div class="card-content"><div class="card-title">Corporate</div><div class="card-desc">Trust, structure, professional</div></div></div>
+                    <div class="select-card" data-value="Swiss / International style with grid-heavy layout and clean Helvetica typography" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="grid"></i></span><div class="card-content"><div class="card-title">Swiss</div><div class="card-desc">Grid-heavy, Helvetica, typographic</div></div></div>
+                    <div class="select-card" data-value="Flat / Material design with clean surfaces and subtle elevation" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="layers"></i></span><div class="card-content"><div class="card-title">Flat / Material</div><div class="card-desc">Clean surfaces, subtle elevation</div></div></div>
+                    <div class="select-card" data-value="Nordic / Scandinavian with muted tones and functional simplicity" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="snowflake"></i></span><div class="card-content"><div class="card-title">Nordic</div><div class="card-desc">Muted tones, functional, airy</div></div></div>
+                    <div class="select-card" data-value="Bento Grid layout with mixed card sizes inspired by Apple design" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="layout-grid"></i></span><div class="card-content"><div class="card-title">Bento Grid</div><div class="card-desc">Apple-style mixed card sizes</div></div></div>
+                    <div class="select-card" data-value="Japanese / Zen with wabi-sabi aesthetics and intentional asymmetry" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="sun"></i></span><div class="card-content"><div class="card-title">Japanese / Zen</div><div class="card-desc">Wabi-sabi, muted, asymmetric</div></div></div>
+                    <div class="select-card" data-value="Neomorphism with soft shadows" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="circle-dot"></i></span><div class="card-content"><div class="card-title">Neomorphism</div><div class="card-desc">Soft UI, embossed, subtle depth</div></div></div>
+                    <div class="select-card" data-value="Elegant and Luxury" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="crown"></i></span><div class="card-content"><div class="card-title">Luxury</div><div class="card-desc">Premium, serif fonts, gold accents</div></div></div>
+                </div>
+            </div>
+            <div class="style-group">
+                <div class="style-group-label">Bold &amp; Dynamic</div>
+                <div class="card-grid horizontal">
+                    <div class="select-card" data-value="Dark and Modern" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="moon"></i></span><div class="card-content"><div class="card-title">Dark Modern</div><div class="card-desc">Dark theme, sleek, tech-forward</div></div></div>
+                    <div class="select-card" data-value="Cyberpunk / Neon" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="zap"></i></span><div class="card-content"><div class="card-title">Cyberpunk</div><div class="card-desc">Neon glow, futuristic, high contrast</div></div></div>
+                    <div class="select-card" data-value="Brutalist / Raw" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="box"></i></span><div class="card-content"><div class="card-title">Brutalist</div><div class="card-desc">Raw, bold, anti-design</div></div></div>
+                    <div class="select-card" data-value="Maximalist with bold patterns and layered visuals" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="palette"></i></span><div class="card-content"><div class="card-title">Maximalist</div><div class="card-desc">Bold patterns, layered, vibrant</div></div></div>
+                    <div class="select-card" data-value="Gradient and Abstract" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="wand-2"></i></span><div class="card-content"><div class="card-title">Gradient</div><div class="card-desc">Colorful gradients, abstract art</div></div></div>
+                    <div class="select-card" data-value="Playful and Colorful" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="smile"></i></span><div class="card-content"><div class="card-title">Playful</div><div class="card-desc">Fun, vibrant, rounded shapes</div></div></div>
+                    <div class="select-card" data-value="Editorial / Magazine with bold typography and asymmetric layouts" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="book-open"></i></span><div class="card-content"><div class="card-title">Editorial</div><div class="card-desc">Bold headlines, magazine layout</div></div></div>
+                    <div class="select-card" data-value="Parallax / Immersive with scroll-driven animations and layered depth" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="layers"></i></span><div class="card-content"><div class="card-title">Parallax</div><div class="card-desc">Scroll-driven, layered, immersive</div></div></div>
+                    <div class="select-card" data-value="Terminal / Hacker aesthetic with monospace fonts and code-inspired UI" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="terminal"></i></span><div class="card-content"><div class="card-title">Terminal</div><div class="card-desc">Monospace, code aesthetic, hacker</div></div></div>
+                </div>
+            </div>
+            <div class="style-group">
+                <div class="style-group-label">Textured &amp; Themed</div>
+                <div class="card-grid horizontal">
+                    <div class="select-card" data-value="Glassmorphism with frosted glass effects" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="sparkles"></i></span><div class="card-content"><div class="card-title">Glassmorphism</div><div class="card-desc">Frosted glass, blur, translucent</div></div></div>
+                    <div class="select-card" data-value="Glasspunk / Transparent with vivid colors and layered glass panels" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="gem"></i></span><div class="card-content"><div class="card-title">Glasspunk</div><div class="card-desc">Vivid glass layers, colorful depth</div></div></div>
+                    <div class="select-card" data-value="Skeuomorphic with realistic textures and shadows mimicking physical objects" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="compass"></i></span><div class="card-content"><div class="card-title">Skeuomorphic</div><div class="card-desc">Realistic textures, physical look</div></div></div>
+                    <div class="select-card" data-value="Art Deco with geometric patterns and gold accents" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="shield"></i></span><div class="card-content"><div class="card-title">Art Deco</div><div class="card-desc">Geometric, gold lines, 1920s elegance</div></div></div>
+                    <div class="select-card" data-value="Boho / Bohemian with handwritten fonts and earthy textures" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="feather"></i></span><div class="card-content"><div class="card-title">Bohemian</div><div class="card-desc">Handwritten fonts, warm, eclectic</div></div></div>
+                    <div class="select-card" data-value="Industrial with exposed textures, steel tones, and monospace fonts" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="hammer"></i></span><div class="card-content"><div class="card-title">Industrial</div><div class="card-desc">Brick, steel, concrete feel</div></div></div>
+                    <div class="select-card" data-value="Vintage Rustic with hand-drawn illustrations and chalkboard textures" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="pen-tool"></i></span><div class="card-content"><div class="card-title">Vintage Rustic</div><div class="card-desc">Chalkboard, hand-drawn, artisan</div></div></div>
+                    <div class="select-card" data-value="Organic and Natural" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="leaf"></i></span><div class="card-content"><div class="card-title">Organic</div><div class="card-desc">Earthy, warm, nature-inspired</div></div></div>
+                    <div class="select-card" data-value="Retro / Vintage" onclick="selectCard(this,&#39;style&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="disc"></i></span><div class="card-content"><div class="card-title">Retro</div><div class="card-desc">Vintage, nostalgic, classic vibes</div></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 3: Colors -->
+    <div class="step-panel" data-step="3">
+        <div class="step-header"><h2 class="step-title">Choose a color scheme</h2><span class="step-counter">Step 3 of 7</span></div>
+        <p class="step-description">Pick a curated palette or enter your own brand colors below.</p>
+        <div id="colorGrid">
+            <div class="style-group">
+                <div class="style-group-label">Light &amp; Clean</div>
+                <div class="card-grid wide">
+                    <div class="select-card color-card" data-palette="classic-blue" data-value="Blue (#3B82F6) as primary with white (#ffffff) background" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#ffffff"></span><span style="background:#3B82F6"></span><span style="background:#1E293B"></span><span style="background:#F1F5F9"></span></div><div class="card-title-row"><div class="card-title">Classic Blue</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="forest-green" data-value="Emerald (#10B981) and Forest (#064E3B) with light background" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#F0FDF4"></span><span style="background:#10B981"></span><span style="background:#064E3B"></span><span style="background:#ffffff"></span></div><div class="card-title-row"><div class="card-title">Forest Green</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="ocean-blue" data-value="Ocean Blue (#0077B6) as primary with white background and dark navy (#023E8A) accents" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#ffffff"></span><span style="background:#0077B6"></span><span style="background:#023E8A"></span><span style="background:#CAF0F8"></span></div><div class="card-title-row"><div class="card-title">Ocean Blue</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="modern-teal" data-value="Teal (#2a7d6e) as primary with white background and dark teal (#1e5f53) accents" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#ffffff"></span><span style="background:#2a7d6e"></span><span style="background:#1e5f53"></span><span style="background:#E6F5F0"></span></div><div class="card-title-row"><div class="card-title">Modern Teal</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="monochrome" data-value="Slate (#64748B) and Neutral (#171717) with white background for a monochrome look" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#ffffff"></span><span style="background:#171717"></span><span style="background:#64748B"></span><span style="background:#F8FAFC"></span></div><div class="card-title-row"><div class="card-title">Monochrome</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="soft-blush" data-value="Soft Pink (#e8a0bf) as primary with light blush (#FDF2F8) background and mauve (#9d4e7c) accents" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#FDF2F8"></span><span style="background:#e8a0bf"></span><span style="background:#9d4e7c"></span><span style="background:#ffffff"></span></div><div class="card-title-row"><div class="card-title">Soft Blush</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="lavender" data-value="Lavender (#9b8ec4) and Soft Purple (#7c6daa) with light (#F5F3FF) background" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#F5F3FF"></span><span style="background:#9b8ec4"></span><span style="background:#7c6daa"></span><span style="background:#ffffff"></span></div><div class="card-title-row"><div class="card-title">Lavender</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="nordic-slate" data-value="Nordic slate palette with ice gray (#F0F5F9) background, cool steel (#C9D6DF), slate (#52616B), and near-black (#1E2022)" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#F0F5F9"></span><span style="background:#C9D6DF"></span><span style="background:#52616B"></span><span style="background:#1E2022"></span></div><div class="card-title-row"><div class="card-title">Nordic Slate</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="silver-lining" data-value="Silver lining palette with charcoal (#595959), grey (#7F7F7F), silver (#A5A5A5), dust grey (#CCCCCC), and platinum (#F2F2F2)" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#595959"></span><span style="background:#A5A5A5"></span><span style="background:#CCCCCC"></span><span style="background:#F2F2F2"></span></div><div class="card-title-row"><div class="card-title">Silver Lining</div><div class="color-rec">Suggested</div></div></div>
+                </div>
+            </div>
+            <div class="style-group">
+                <div class="style-group-label">Warm &amp; Earthy</div>
+                <div class="card-grid wide">
+                    <div class="select-card color-card" data-palette="sunset-rose" data-value="Rose (#F43F5E) and Coral (#FB923C) with light (#FFF1F2) background" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#FFF1F2"></span><span style="background:#F43F5E"></span><span style="background:#FB923C"></span><span style="background:#ffffff"></span></div><div class="card-title-row"><div class="card-title">Sunset Rose</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="charcoal-gold" data-value="Charcoal (#333333) with Gold (#d4a843) accents on white background for a luxury feel" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#ffffff"></span><span style="background:#333333"></span><span style="background:#d4a843"></span><span style="background:#F5F0E8"></span></div><div class="card-title-row"><div class="card-title">Charcoal &amp; Gold</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="warm-neutral" data-value="Warm neutral palette with cream (#EFE9E3), sand (#D9CFC7), camel (#C9B59C), and soft rose (#F7A5A5) accents on white background" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#EFE9E3"></span><span style="background:#D9CFC7"></span><span style="background:#C9B59C"></span><span style="background:#F7A5A5"></span></div><div class="card-title-row"><div class="card-title">Warm Neutral</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="greenery-moss" data-value="Greenery palette with soft green (#EBF4DD) background, muted sage (#90AB8B), forest (#5A7863), and dark teal (#3B4953)" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#EBF4DD"></span><span style="background:#90AB8B"></span><span style="background:#5A7863"></span><span style="background:#3B4953"></span></div><div class="card-title-row"><div class="card-title">Greenery Moss</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="pastel-dream" data-value="Pastel palette with soft blue (#9ECAD6), muted indigo (#748DAE), blush pink (#F5CBCB), and light rose (#FFEAEA)" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#9ECAD6"></span><span style="background:#748DAE"></span><span style="background:#F5CBCB"></span><span style="background:#FFEAEA"></span></div><div class="card-title-row"><div class="card-title">Pastel Dream</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="ice-cream" data-value="Ice cream palette with icy blue (#F2F9FF) background, candy pink (#FFCCE1), mauve rose (#E195AB), and vanilla (#FFF5D7)" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#F2F9FF"></span><span style="background:#FFCCE1"></span><span style="background:#E195AB"></span><span style="background:#FFF5D7"></span></div><div class="card-title-row"><div class="card-title">Ice Cream</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="honey-orange" data-value="Honey orange palette with warm white (#FFFDF1) background, peach (#FFCE99), bright orange (#FF9644), and deep brown (#562F00)" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#FFFDF1"></span><span style="background:#FFCE99"></span><span style="background:#FF9644"></span><span style="background:#562F00"></span></div><div class="card-title-row"><div class="card-title">Honey Orange</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="summer-fields" data-value="Golden summer palette with dry sage (#CCD5AE), light olive (#E9EDC9), cornsilk (#FEFAE0), papaya whip (#FAEDCD), and light bronze (#D4A373)" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#CCD5AE"></span><span style="background:#E9EDC9"></span><span style="background:#FEFAE0"></span><span style="background:#D4A373"></span></div><div class="card-title-row"><div class="card-title">Summer Fields</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="mauve-serenity" data-value="Mauve serenity palette with charcoal (#565264), dim grey (#706677), dusty mauve (#A6808C), almond silk (#CCB7AE), and dust grey (#D6CFCB)" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#565264"></span><span style="background:#A6808C"></span><span style="background:#CCB7AE"></span><span style="background:#D6CFCB"></span></div><div class="card-title-row"><div class="card-title">Mauve Serenity</div><div class="color-rec">Suggested</div></div></div>
+                </div>
+            </div>
+            <div class="style-group">
+                <div class="style-group-label">Dark &amp; Bold</div>
+                <div class="card-grid wide">
+                    <div class="select-card color-card" data-palette="warm-amber" data-value="Amber (#F59E0B) as primary with warm dark (#1C1917) background" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#1C1917"></span><span style="background:#F59E0B"></span><span style="background:#78350F"></span><span style="background:#FEF3C7"></span></div><div class="card-title-row"><div class="card-title">Warm Amber</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="electric-orange" data-value="Electric Orange (#e8590c) as primary with dark (#1a1a1a) background and warm (#FFF7ED) accents" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#1a1a1a"></span><span style="background:#e8590c"></span><span style="background:#c2410c"></span><span style="background:#FFF7ED"></span></div><div class="card-title-row"><div class="card-title">Electric Orange</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="urban-dusk" data-value="Dark palette with charcoal (#222831) background, gunmetal (#393E46), warm khaki (#948979), and sand (#DFD0B8) accents" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#222831"></span><span style="background:#393E46"></span><span style="background:#948979"></span><span style="background:#DFD0B8"></span></div><div class="card-title-row"><div class="card-title">Urban Dusk</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="midnight" data-value="Midnight dark mode palette with near-black (#0a0a0a) background, dark gray (#1a1a1a) cards, soft white (#e0e0e0) text, and subtle (#2a2a2a) borders" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#0a0a0a"></span><span style="background:#1a1a1a"></span><span style="background:#2a2a2a"></span><span style="background:#e0e0e0"></span></div><div class="card-title-row"><div class="card-title">Midnight</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="graphite-copper" data-value="Graphite and Copper palette with warm charcoal (#1c1c1e) background, muted copper (#b87333) accents, cream (#f5f0e8) text, and dark card (#2c2c2e) surfaces" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#1c1c1e"></span><span style="background:#2c2c2e"></span><span style="background:#b87333"></span><span style="background:#f5f0e8"></span></div><div class="card-title-row"><div class="card-title">Graphite &amp; Copper</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="terminal-green" data-value="Terminal Green hacker palette with pure black (#0a0a0a) background, electric green (#00ff88) accents, dark green (#003322) secondary, and dark (#1a1a1a) surfaces" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#0a0a0a"></span><span style="background:#1a1a1a"></span><span style="background:#003322"></span><span style="background:#00ff88"></span></div><div class="card-title-row"><div class="card-title">Terminal Green</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="deep-ocean" data-value="Deep Ocean palette with very dark teal-gray (#0f1419) background, muted teal (#4a9a8e) accents, silver (#a8b2c1) text, and dark card (#192028) surfaces" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#0f1419"></span><span style="background:#192028"></span><span style="background:#4a9a8e"></span><span style="background:#a8b2c1"></span></div><div class="card-title-row"><div class="card-title">Deep Ocean</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="ink-paper" data-value="Ink and Paper editorial palette with off-black (#141517) background, warm white (#fffdf5) text, blue-gray (#7d8590) secondary, and dark slate (#1e2024) cards" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#141517"></span><span style="background:#1e2024"></span><span style="background:#7d8590"></span><span style="background:#fffdf5"></span></div><div class="card-title-row"><div class="card-title">Ink &amp; Paper</div><div class="color-rec">Suggested</div></div></div>
+                    <div class="select-card color-card" data-palette="neon-night" data-value="Neon Night cyberpunk palette with deep space (#0b0b1a) background, cyan (#00d9ff) primary, magenta (#ff00aa) accent, and dark navy (#1a1a2e) cards" onclick="selectCard(this,&#39;color&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#0b0b1a"></span><span style="background:#1a1a2e"></span><span style="background:#00d9ff"></span><span style="background:#ff00aa"></span></div><div class="card-title-row"><div class="card-title">Neon Night</div><div class="color-rec">Suggested</div></div></div>
+                </div>
+            </div>
+        </div>
+        <div class="custom-color-section">
+            <label class="section-label" style="margin-top:20px">Or enter your own custom colors</label>
+            <div class="custom-color-row">
+                <div class="color-input-wrap"><label>Primary</label><div class="color-input-field"><input type="color" id="customColor1" value="#2a7d6e"><input type="text" id="customColor1Text" value="#2a7d6e" maxlength="7" oninput="syncColor(this,&#39;customColor1&#39;)"></div></div>
+                <div class="color-input-wrap"><label>Accent</label><div class="color-input-field"><input type="color" id="customColor2" value="#b8885a"><input type="text" id="customColor2Text" value="#b8885a" maxlength="7" oninput="syncColor(this,&#39;customColor2&#39;)"></div></div>
+                <div class="color-input-wrap"><label>Background</label><div class="color-input-field"><input type="color" id="customColor3" value="#ffffff"><input type="text" id="customColor3Text" value="#ffffff" maxlength="7" oninput="syncColor(this,&#39;customColor3&#39;)"></div></div>
+                <div class="color-input-wrap"><label>Text</label><div class="color-input-field"><input type="color" id="customColor4" value="#1e1e1c"><input type="text" id="customColor4Text" value="#1e1e1c" maxlength="7" oninput="syncColor(this,&#39;customColor4&#39;)"></div></div>
+                <div class="color-input-wrap"><label>Secondary</label><div class="color-input-field"><input type="color" id="customColor5" value="#f5f5f3"><input type="text" id="customColor5Text" value="#f5f5f3" maxlength="7" oninput="syncColor(this,&#39;customColor5&#39;)"></div></div>
+            </div>
+            <button class="btn btn-secondary" style="margin-top:12px;display:block;margin-left:auto;margin-right:auto" onclick="applyCustomColors()"><i data-lucide="palette"></i> Apply Custom Colors</button>
+        </div>
+    </div>
+
+    <!-- Step 4: Layout -->
+    <div class="step-panel" data-step="4">
+        <div class="step-header"><h2 class="step-title">Layout preferences</h2><span class="step-counter">Step 4 of 7</span></div>
+        <p class="step-description">Choose how key sections of your website should be structured.</p>
+        <div style="margin-bottom:28px"><label class="section-label">Header / Navigation Style</label><div class="card-grid compact" id="headerGrid">
+            <div class="select-card" data-value="Fixed top navigation bar" onclick="selectCard(this,&#39;header&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Top Navbar</div><div class="card-desc">Classic fixed header</div></div>
+            <div class="select-card" data-value="Left sidebar navigation" onclick="selectCard(this,&#39;header&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Sidebar</div><div class="card-desc">Vertical left-side nav</div></div>
+            <div class="select-card" data-value="Centered logo with navigation below" onclick="selectCard(this,&#39;header&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Centered</div><div class="card-desc">Logo center, links below</div></div>
+            <div class="select-card" data-value="Hamburger menu only (hidden nav)" onclick="selectCard(this,&#39;header&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Hamburger</div><div class="card-desc">Hidden full-screen menu</div></div>
+        </div></div>
+        <div style="margin-bottom:28px"><label class="section-label">Hero Section Style</label><div class="card-grid compact" id="heroGrid">
+            <div class="select-card" data-value="Full-screen hero with background image and centered text" onclick="selectCard(this,&#39;hero&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Full Image</div><div class="card-desc">Background image, centered text</div></div>
+            <div class="select-card" data-value="Split hero with text on left and image on right" onclick="selectCard(this,&#39;hero&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Split Layout</div><div class="card-desc">Text left, image right</div></div>
+            <div class="select-card" data-value="Gradient or animated background hero" onclick="selectCard(this,&#39;hero&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Gradient</div><div class="card-desc">Animated gradient background</div></div>
+            <div class="select-card" data-value="Video background hero section" onclick="selectCard(this,&#39;hero&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Video BG</div><div class="card-desc">Looping video background</div></div>
+            <div class="select-card" data-value="Minimal text-only hero with bold typography, no background image" onclick="selectCard(this,&#39;hero&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Text Only</div><div class="card-desc">Bold typography, minimal</div></div>
+            <div class="select-card" data-value="Image slider or carousel hero rotating multiple slides" onclick="selectCard(this,&#39;hero&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Image Slider</div><div class="card-desc">Rotating slides carousel</div></div>
+            <div class="select-card" data-value="Animated particle, 3D, or interactive canvas hero background" onclick="selectCard(this,&#39;hero&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Particle / 3D</div><div class="card-desc">Interactive animated canvas</div></div>
+        </div></div>
+        <div style="margin-bottom:28px"><label class="section-label">Content Layout</label><div class="card-grid compact" id="contentGrid">
+            <div class="select-card" data-value="Card-based grid layout for content sections" onclick="selectCard(this,&#39;content&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Card Grid</div><div class="card-desc">Grid of cards for content</div></div>
+            <div class="select-card" data-value="Single column with alternating left-right sections" onclick="selectCard(this,&#39;content&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Alternating</div><div class="card-desc">Zigzag left-right sections</div></div>
+            <div class="select-card" data-value="Masonry / Pinterest-style grid layout" onclick="selectCard(this,&#39;content&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Masonry</div><div class="card-desc">Pinterest-style staggered grid</div></div>
+            <div class="select-card" data-value="Timeline / scroll-based storytelling layout" onclick="selectCard(this,&#39;content&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Timeline</div><div class="card-desc">Scrolling story or history</div></div>
+        </div></div>
+        <div style="margin-bottom:28px"><label class="section-label">Footer Style</label><div class="card-grid compact" id="footerGrid">
+            <div class="select-card" data-value="Minimal footer with copyright and social links in one line" onclick="selectCard(this,&#39;footer&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Minimal</div><div class="card-desc">One-line copyright &amp; links</div></div>
+            <div class="select-card" data-value="Multi-column footer with links, about, contact, and social sections" onclick="selectCard(this,&#39;footer&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Multi-Column</div><div class="card-desc">Links, about, contact columns</div></div>
+            <div class="select-card" data-value="Fat footer with newsletter signup, links, map, and social icons" onclick="selectCard(this,&#39;footer&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Fat Footer</div><div class="card-desc">Newsletter, map, rich content</div></div>
+            <div class="select-card" data-value="Sticky bottom bar with key CTA and quick links always visible" onclick="selectCard(this,&#39;footer&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Sticky Bar</div><div class="card-desc">Fixed bottom bar with CTA</div></div>
+        </div></div>
+        <div style="margin-bottom:28px"><label class="section-label">Section Spacing</label><div class="card-grid compact" id="spacingGrid">
+            <div class="select-card" data-value="Compact section spacing with minimal padding between sections" onclick="selectCard(this,&#39;spacing&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Compact</div><div class="card-desc">Dense, tight, more content visible</div></div>
+            <div class="select-card" data-value="Normal section spacing with balanced padding" onclick="selectCard(this,&#39;spacing&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Normal</div><div class="card-desc">Balanced, standard padding</div></div>
+            <div class="select-card" data-value="Spacious section spacing with generous whitespace and breathing room" onclick="selectCard(this,&#39;spacing&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Spacious</div><div class="card-desc">Generous whitespace, airy</div></div>
+        </div></div>
+        <div><label class="section-label">Scroll Animation Style</label><div class="card-grid compact" id="animationGrid">
+            <div class="select-card" data-value="Fade-in animations on scroll for sections and elements" onclick="selectCard(this,&#39;animation&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Fade In</div><div class="card-desc">Elements fade in on scroll</div></div>
+            <div class="select-card" data-value="Slide-up animations on scroll with staggered delays" onclick="selectCard(this,&#39;animation&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Slide Up</div><div class="card-desc">Staggered slide-up reveals</div></div>
+            <div class="select-card" data-value="Parallax layers with depth-based scrolling effects" onclick="selectCard(this,&#39;animation&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Parallax Layers</div><div class="card-desc">Depth-based scroll effects</div></div>
+            <div class="select-card" data-value="No scroll animations, keep it static and clean" onclick="selectCard(this,&#39;animation&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">None</div><div class="card-desc">Static, no animation</div></div>
+        </div></div>
+    </div>
+
+    <!-- Step 5: Content -->
+    <div class="step-panel" data-step="5">
+        <div class="step-header"><h2 class="step-title">Content details</h2><span class="step-counter">Step 5 of 7</span></div>
+        <p class="step-description">Tell us about your website's content and tone. All fields are optional.</p>
+        <div class="input-row">
+            <div class="input-group"><label>Website / Business Name</label><input type="text" id="siteName" placeholder="e.g. Starter Cafe"></div>
+            <div class="input-group"><label>Tagline / Headline</label><input type="text" id="siteTagline" placeholder="e.g. Fresh coffee, warm vibes"></div>
+        </div>
+        <div class="input-group"><label>Brief Description (what is the site about?)</label><textarea id="siteDescription" placeholder="e.g. A modern cafe in downtown Portland serving specialty coffee and homemade pastries."></textarea></div>
+        <div style="margin-bottom:28px"><label class="section-label">Tone / Voice</label><div class="card-grid compact" id="toneGrid">
+            <div class="select-card" data-value="Professional and trustworthy" onclick="selectCard(this,&#39;siteTone&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Professional</div><div class="card-desc">Trustworthy, confident</div></div>
+            <div class="select-card" data-value="Casual and friendly" onclick="selectCard(this,&#39;siteTone&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Casual &amp; Friendly</div><div class="card-desc">Approachable, relaxed</div></div>
+            <div class="select-card" data-value="Bold and energetic" onclick="selectCard(this,&#39;siteTone&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Bold &amp; Energetic</div><div class="card-desc">Dynamic, high-energy</div></div>
+            <div class="select-card" data-value="Elegant and sophisticated" onclick="selectCard(this,&#39;siteTone&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Elegant</div><div class="card-desc">Sophisticated, refined</div></div>
+            <div class="select-card" data-value="Playful and fun" onclick="selectCard(this,&#39;siteTone&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Playful &amp; Fun</div><div class="card-desc">Lighthearted, cheerful</div></div>
+            <div class="select-card" data-value="Minimal and direct" onclick="selectCard(this,&#39;siteTone&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Minimal &amp; Direct</div><div class="card-desc">Clean, to the point</div></div>
+            <div class="select-card" data-value="Warm and welcoming" onclick="selectCard(this,&#39;siteTone&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Warm &amp; Welcoming</div><div class="card-desc">Cozy, inviting</div></div>
+            <div class="select-card" data-value="Techy and innovative" onclick="selectCard(this,&#39;siteTone&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Tech &amp; Innovative</div><div class="card-desc">Forward-thinking, modern</div></div>
+        </div></div>
+        <div style="margin-bottom:28px"><label class="section-label">Number of Pages</label><div class="card-grid compact" id="pageGrid">
+            <div class="select-card" data-value="Single page (one-page scrolling)" onclick="selectCard(this,&#39;pageCount&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Single Page</div><div class="card-desc">One-page scrolling site</div></div>
+            <div class="select-card" data-value="Multi-page (3-5 pages)" onclick="selectCard(this,&#39;pageCount&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Multi-page (3-5)</div><div class="card-desc">Small site, a few pages</div></div>
+            <div class="select-card" data-value="Multi-page (5-10 pages)" onclick="selectCard(this,&#39;pageCount&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Multi-page (5-10)</div><div class="card-desc">Larger site, many pages</div></div>
+        </div></div>
+        <div class="input-group"><label>Specific Sections to Include (optional)</label><input type="text" id="customSections" placeholder="e.g. Team, Testimonials, Portfolio, Menu, Booking Form"></div>
+    </div>
+
+    <!-- Step 6: Features & Tech -->
+    <div class="step-panel" data-step="6">
+        <div class="step-header"><h2 class="step-title">Features &amp; tech stack</h2><span class="step-counter">Step 6 of 7</span></div>
+        <p class="step-description">Select interactive features and choose your technology preferences.</p>
+        <div style="margin-bottom:28px"><label class="section-label">Interactive Features</label>
+        <div class="feature-grid" id="featureGrid">
+            <div class="feature-card" data-value="Responsive hamburger mobile menu" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Mobile Menu</span></div>
+            <div class="feature-card" data-value="Dark / Light mode toggle" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Dark/Light Toggle</span></div>
+            <div class="feature-card" data-value="Smooth scroll navigation" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Smooth Scroll</span></div>
+            <div class="feature-card" data-value="Scroll-triggered fade-in animations" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Scroll Animations</span></div>
+            <div class="feature-card" data-value="Contact form with validation" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Contact Form</span></div>
+            <div class="feature-card" data-value="Image or testimonial carousel/slider" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Carousel / Slider</span></div>
+            <div class="feature-card" data-value="Pricing table section" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Pricing Table</span></div>
+            <div class="feature-card" data-value="FAQ accordion section" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">FAQ Accordion</span></div>
+            <div class="feature-card" data-value="Back to top button" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Back to Top</span></div>
+            <div class="feature-card" data-value="Parallax scrolling effect" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Parallax Effect</span></div>
+            <div class="feature-card" data-value="Animated statistics counter section" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Stats Counter</span></div>
+            <div class="feature-card" data-value="Image lightbox gallery" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Image Lightbox</span></div>
+            <div class="feature-card" data-value="Newsletter subscription form" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Newsletter Signup</span></div>
+            <div class="feature-card" data-value="Social media icon links" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Social Links</span></div>
+            <div class="feature-card" data-value="Google Maps embed" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Google Maps</span></div>
+            <div class="feature-card" data-value="Preloader / loading animation" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Preloader</span></div>
+            <div class="feature-card" data-value="Sticky call-to-action button" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Sticky CTA</span></div>
+            <div class="feature-card" data-value="Custom cursor effect" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Custom Cursor</span></div>
+        </div></div>
+        <div style="margin-bottom:28px"><label class="section-label">Technology Stack</label><div class="card-grid" id="techGrid">
+            <div class="select-card" data-value="Pure HTML, CSS, and vanilla JavaScript" onclick="selectCard(this,&#39;tech&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="code-2"></i></span><div class="card-content"><div class="card-title">HTML / CSS / JS</div><div class="card-desc">Pure vanilla, no frameworks</div></div></div>
+            <div class="select-card" data-value="HTML with Tailwind CSS and vanilla JavaScript" onclick="selectCard(this,&#39;tech&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="wind"></i></span><div class="card-content"><div class="card-title">Tailwind CSS</div><div class="card-desc">Utility-first CSS framework</div></div></div>
+            <div class="select-card" data-value="HTML with Bootstrap 5 framework" onclick="selectCard(this,&#39;tech&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="layout"></i></span><div class="card-content"><div class="card-title">Bootstrap 5</div><div class="card-desc">Popular component framework</div></div></div>
+            <div class="select-card" data-value="React (JSX) with CSS modules or styled-components" onclick="selectCard(this,&#39;tech&#39;)"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="atom"></i></span><div class="card-content"><div class="card-title">React</div><div class="card-desc">Component-based with JSX</div></div></div>
+        </div></div>
+        <div style="margin-bottom:28px"><label class="section-label">Code Preferences</label><div class="feature-grid" id="techFeatureGrid">
+            <div class="feature-card" data-value="Include detailed code comments" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Code Comments</span></div>
+            <div class="feature-card" data-value="Use semantic HTML5 elements" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Semantic HTML5</span></div>
+            <div class="feature-card" data-value="Use CSS custom properties (variables)" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">CSS Variables</span></div>
+            <div class="feature-card" data-value="Optimize for SEO with proper meta tags" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">SEO Meta Tags</span></div>
+            <div class="feature-card" data-value="Include Google Fonts" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Google Fonts</span></div>
+            <div class="feature-card" data-value="Use Font Awesome or Lucide icons" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Icon Library</span></div>
+            <div class="feature-card" data-value="Ensure WCAG accessibility standards" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Accessibility</span></div>
+            <div class="feature-card" data-value="Keep all code in a single HTML file" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Single File</span></div>
+        </div></div>
+        <div class="input-group"><label>Font Preferences (optional)</label><input type="text" id="fontPref" placeholder="e.g. Playfair Display for headings, Inter for body text"></div>
+    </div>
+
+    <!-- Step 7: Output -->
+    <div class="step-panel" data-step="7">
+        <div class="step-header"><h2 class="step-title">Your AI prompt is ready!</h2><span class="step-counter">Step 7 of 7</span></div>
+        <p class="step-description">Copy this prompt and paste it into ChatGPT, Claude, or any AI tool to generate your website.</p>
+        <div class="prompt-output-container">
+            <div class="prompt-output-header">
+                <div class="prompt-output-title"><i data-lucide="file-text"></i> Generated Prompt</div>
+                <div class="prompt-output-actions">
+                    <button class="btn-sm" onclick="copyPrompt()" id="copyBtn"><i data-lucide="copy"></i> Copy</button>
+                    <button class="btn-sm" onclick="downloadPrompt()"><i data-lucide="download"></i> Download .txt</button>
+                </div>
+            </div>
+            <div class="prompt-text" id="promptOutput" contenteditable="true"></div>
+            <div class="prompt-resize-bar" id="resizeBar">
+                <div class="resize-grip"><span></span><span></span></div>
+                <div class="resize-btns" onclick="event.stopPropagation()">
+                    <button class="resize-btn resize-btn-min" onclick="setPromptHeight(&#39;min&#39;)" title="Compact"><div class="resize-btn-inner"></div></button>
+                    <button class="resize-btn resize-btn-mid active" onclick="setPromptHeight(&#39;mid&#39;)" title="Default"><div class="resize-btn-inner"></div></button>
+                    <button class="resize-btn resize-btn-max" onclick="setPromptHeight(&#39;max&#39;)" title="Expanded"><div class="resize-btn-inner"></div></button>
+                </div>
+            </div>
+            <div class="edit-hint">Click the text above to edit your prompt before copying.</div>
+            <div class="quality-score">
+                <span class="quality-label">Prompt Detail Score</span>
+                <div class="quality-bar"><div class="quality-fill" id="qualityFill"></div></div>
+                <span class="quality-percent" id="qualityPercent">0%</span>
+            </div>
+        </div>
+        <div class="output-footer">
+          <div class="output-tip">Want to tweak it? <a href="#" onclick="goToStep(1); return false;">Edit selections</a></div>
+          <div class="output-footer-actions">
+            <button type="button" class="btn btn-secondary" onclick="startOver()"><i data-lucide="rotate-ccw"></i> Start Over</button>
+            <button type="button" class="btn btn-secondary" onclick="prevStep()"><i data-lucide="arrow-left"></i> Back</button>
+            <button type="button" class="btn btn-primary" id="btnContinuePrompt" onclick="continueToChat()">Continue to Chat <i data-lucide="arrow-right"></i></button>
+          </div>
+        </div>
+    </div>
+
+    <footer id="wizardFooter" class="wizard-footer">
+      <div class="wizard-footer-left">
+        <button type="button" class="btn btn-secondary" id="wizardBackBtn" hidden onclick="prevStep()">
+          <i data-lucide="arrow-left"></i> Back
+        </button>
+        <button type="button" class="btn btn-skip" id="wizardSkipBtn" hidden onclick="nextStep()">Skip</button>
+      </div>
+      <div class="wizard-footer-center">
+        <div class="progress-bar-track"><div class="progress-bar-fill" id="progressBarFill"></div></div>
+        <div class="progress-row" id="progressRow" role="navigation" aria-label="Wizard steps"></div>
+      </div>
+      <div class="wizard-footer-right">
+        <button type="button" class="btn btn-primary" id="wizardNextBtn" onclick="wizardFooterNext()">
+          Next <i data-lucide="arrow-right"></i>
+        </button>
+      </div>
+    </footer>
+  </div>
+</div>
+</dialog>
+
+  <!-- ============ SETTINGS MODAL ============ -->
+  <dialog id="settingsModal">
+    <div class="modal-header">
+      <h2><i data-lucide="settings"></i> AI &amp; Skills Settings</h2>
+      <button class="modal-close" type="button" aria-label="Close settings" onclick="this.closest('dialog').close()"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body settings-body">
+      <div class="settings-grid">
+        <div class="form-group">
+          <label for="modalProviderType">Provider</label>
+          <select id="modalProviderType">
+            <option value="openrouter">OpenRouter</option>
+            <option value="lmstudio">LM Studio</option>
+            <option value="ollama">Ollama</option>
+            <option value="custom">Custom OpenAI-Compatible</option>
+          </select>
+        </div>
+        <div class="form-group" id="modalApiKeyGroup">
+          <label for="modalApiKey">API Key</label>
+          <input type="password" id="modalApiKey" placeholder="sk-or-v1-..." autocomplete="off">
+        </div>
+        <div class="form-group settings-span-2" id="modalBaseUrlGroup" style="display:none">
+          <label for="modalBaseUrl">Base URL</label>
+          <input type="text" id="modalBaseUrl" placeholder="http://localhost:1234/v1">
+        </div>
+      </div>
+
+      <div class="form-group model-picker-group">
+        <div class="model-picker-label-row">
+          <label for="modelSearch">Model</label>
+          <span class="model-count" id="modelCountHint"></span>
+        </div>
+        <div class="model-combobox" id="modelCombobox">
+          <button type="button" class="model-combobox-trigger" id="modelComboboxTrigger" aria-haspopup="listbox" aria-expanded="false">
+            <span id="modelComboboxLabel">No models loaded</span>
+            <i data-lucide="chevron-down"></i>
+          </button>
+          <div class="model-combobox-panel" id="modelComboboxPanel" hidden>
+            <div class="model-combobox-tools">
+              <input type="search" id="modelSearch" placeholder="Search models…" autocomplete="off">
+              <div class="model-filter-chips" id="modelFreeFilterRow" hidden>
+                <button type="button" class="model-chip active" data-filter="all">All</button>
+                <button type="button" class="model-chip" data-filter="free">Free</button>
+              </div>
+            </div>
+            <div class="model-combobox-list" id="modelComboboxList" role="listbox"></div>
+          </div>
+        </div>
+        <select id="modelSelect" class="sr-only" tabindex="-1" aria-hidden="true">
+          <option value="">No models loaded</option>
+        </select>
+      </div>
+
+      <div class="settings-actions">
+        <button type="button" class="btn btn-outline" id="btnTestConnection" onclick="testConnection()">Test Connect</button>
+        <button type="button" class="btn btn-outline" onclick="fetchModels()">Load Models</button>
+      </div>
+
+      <div class="settings-grid settings-params">
+        <div class="form-group">
+          <label for="modalTemperature">Temperature</label>
+          <input type="number" id="modalTemperature" min="0" max="2" step="0.1" value="0.7">
+        </div>
+        <div class="form-group" id="modalMaxTokensGroup">
+          <label for="modalMaxTokens">Max Tokens</label>
+          <input type="number" id="modalMaxTokens" min="1024" max="128000" step="1024" value="16384">
+        </div>
+      </div>
+
+      <div class="settings-skills">
+        <h3>Skills</h3>
+        <div id="skillsList" class="skills-settings-list"></div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Skills Prompt Preview Modal -->
+  <dialog id="skillPromptModal">
+    <div class="modal-header">
+      <h2><i data-lucide="braces"></i> Skill Prompt Preview</h2>
+      <button class="modal-close" type="button" onclick="this.closest('dialog').close()"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <textarea id="skillPromptPreview" readonly rows="12" style="font-family:'Consolas',monospace;font-size:12px;width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:9px;padding:12px;color:var(--text);resize:vertical"></textarea>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Element Inspector Tooltip (floats over preview) -->
+  <div class="element-tooltip" id="elementTooltip" style="display:none;position:fixed;z-index:100;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:8px 12px;box-shadow:var(--shadow)">
+    <code class="tooltip-label" style="font-size:11px;color:var(--primary)"></code>
+    <div class="tooltip-actions" style="margin-top:4px">
+      <button class="btn btn-sm btn-primary" onclick="editSelectedElement()">Edit with AI</button>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+<!-- Scripts (order matters: dependencies first) -->
+<script src="js/providers.js?v=20260805"></script>
+<script src="js/skills.js?v=20260805"></script>
+<script src="js/prompt-builder.js?v=20260805"></script>
+<script src="js/preview.js?v=20260805"></script>
+<script src="js/demos.js?v=20260805"></script>
+<script src="js/app.js?v=20260805"></script>
+
+</body>
+</html>

@@ -1,0 +1,43 @@
+# Dependencies / build (none required, but ignore if added later)
+node_modules/
+dist/
+build/
+.cache/
+*.log
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editors / agents
+.vscode/
+.idea/
+.cursor/
+.agents/
+AGENTS.md
+*.swp
+*.swo
+*~
+
+# Local / personal
+*.local
+.local/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Misc
+*.tmp
+*.bak
+.DS_Store
