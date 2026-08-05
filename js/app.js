@@ -190,10 +190,23 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── Home / Workspace View Toggle ──
 
 function showHomeView() {
+  // Leaving workspace — clear active project so Home Prompt Builder / home bar
+  // never accidentally continue an existing project.
+  activeProjectId = null;
+  conversationHistory = [];
+  VFS = {};
+  activeFilePath = '';
+
   _renderHomeProjects();
   document.getElementById('homeView').style.display = 'flex';
   document.getElementById('workspaceView').style.display = 'none';
   safeCreateIcons();
+}
+
+function isHomeViewActive() {
+  const home = document.getElementById('homeView');
+  if (!home) return true;
+  return home.style.display !== 'none' && getComputedStyle(home).display !== 'none';
 }
 
 function showWorkspaceView() {
@@ -273,7 +286,7 @@ function sendHomePrompt() {
   if (!msg) return;
   input.value = '';
 
-  // Create a new project (this calls openProject → showWorkspaceView)
+  // Always start a brand-new project from the home prompt bar
   createNewProject();
 
   // Transfer the prompt to the workspace chat input and send

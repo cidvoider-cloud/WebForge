@@ -782,9 +782,16 @@ OUTPUT RULES:
       return;
     }
 
-    // Ensure a workspace project exists (Prompt Builder can open from Home)
-    if (typeof activeProjectId !== 'undefined' && !activeProjectId && typeof createNewProject === 'function') {
-      createNewProject();
+    document.getElementById("promptBuilderModal")?.close();
+
+    // From Home: always create a NEW project (never reuse an existing one).
+    // From Workspace: keep the current project so "Build a prompt" edits in-place.
+    const fromHome = typeof isHomeViewActive === 'function'
+      ? isHomeViewActive()
+      : (document.getElementById('workspaceView')?.style.display === 'none');
+
+    if (fromHome || !activeProjectId) {
+      if (typeof createNewProject === 'function') createNewProject();
     } else if (typeof showWorkspaceView === 'function') {
       showWorkspaceView();
     }
@@ -796,12 +803,11 @@ OUTPUT RULES:
       input.style.height = Math.min(input.scrollHeight, 160) + "px";
       input.focus();
     }
-    document.getElementById("promptBuilderModal")?.close();
 
     // Auto-send so the built prompt actually starts generation
     if (typeof sendChatMessage === 'function') {
       requestAnimationFrame(() => sendChatMessage());
-      this.showToast("Prompt sent to WebForge!");
+      this.showToast(fromHome ? "New project created — building…" : "Prompt sent to WebForge!");
     } else {
       this.showToast("Prompt copied to composer!");
     }
