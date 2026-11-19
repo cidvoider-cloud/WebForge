@@ -21,43 +21,45 @@
   --text-xl: 24px;
   --text-2xl: 32px;
 
-  /* Color — map to app neutrals without circular var() */
-  --bg-primary: var(--bg-panel);
-  --bg-secondary: var(--bg-elevated);
-  --bg-card: var(--bg-input);
-  --bg-card-hover: #22222c;
-  --border-hover: var(--border-strong);
-  --text-primary: var(--text);
-  --text-secondary: #a0a0ab;
-  --text-muted: #6b6b78;
-  --accent-primary: var(--primary);
-  --accent-dark: var(--primary-hover);
-  --accent-soft: var(--primary-soft);
-  --success: #34d399;
-  --danger: #ef4444;
-  --prompt-bg: var(--bg);
-  --toggle-bg: var(--bg-input);
+  /* Color — map directly to M3 Cobalt Blue tokens */
+  --bg-primary: var(--md-surface);
+  --bg-secondary: var(--md-surface-container-low);
+  --bg-card: var(--md-surface-container);
+  --bg-card-hover: var(--md-surface-container-high);
+  --border: var(--md-outline-variant);
+  --border-strong: var(--md-outline);
+  --border-hover: var(--md-outline);
+  --text-primary: var(--md-text);
+  --text-secondary: var(--md-text-muted);
+  --text-muted: var(--md-text-dim);
+  --accent-primary: var(--md-primary);
+  --accent-dark: var(--md-primary-hover);
+  --accent-soft: var(--md-primary-container);
+  --success: var(--md-success);
+  --danger: var(--md-error);
+  --prompt-bg: var(--md-bg);
+  --toggle-bg: var(--md-surface-container);
 
   /* Radius: 8 | 16 only */
   --radius-sm: 8px;
   --radius: 16px;
 
   /* Shadow: none | modal elev */
-  --shadow-modal: 0 16px 48px rgba(0, 0, 0, 0.5);
+  --shadow-modal: var(--md-shadow-overlay);
 
   /* Motion */
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
   --duration-fast: 120ms;
   --duration: 200ms;
 
-  font-family: Outfit, sans-serif;
+  font-family: var(--md-font-sans);
   color: var(--text-primary);
   width: min(1120px, calc(100vw - 32px)) !important;
   max-width: none !important;
   height: min(780px, calc(100dvh - 32px));
   max-height: calc(100dvh - 32px);
   border-radius: var(--radius);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   background: var(--bg-primary);
   box-shadow: var(--shadow-modal);
   overflow: hidden;
@@ -292,7 +294,7 @@
   display: none;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--md-on-primary);
   z-index: 2;
 }
 
@@ -300,7 +302,7 @@
   width: 12px;
   height: 12px;
   stroke-width: 2.5;
-  color: #fff;
+  color: var(--md-on-primary);
 }
 
 #promptBuilderModal .select-card.selected .check-mark {
@@ -355,7 +357,7 @@
   font-weight: 600;
   color: var(--accent-primary);
   background: var(--accent-soft);
-  border: 1px solid rgba(255, 92, 56, 0.25);
+  border: 1px solid var(--md-primary-ring);
   padding: 0 var(--space-2);
   border-radius: var(--radius-sm);
   text-transform: uppercase;
@@ -491,7 +493,7 @@
   width: 12px;
   height: 12px;
   stroke-width: 2.5;
-  color: #fff;
+  color: var(--md-on-primary);
   opacity: 0;
 }
 
@@ -643,7 +645,7 @@
 
 #promptBuilderModal .btn-primary {
   background: var(--accent-primary);
-  color: #fff;
+  color: var(--md-on-primary);
 }
 
 #promptBuilderModal .btn-primary:hover:not(:disabled) {
@@ -804,7 +806,7 @@
 #promptBuilderModal .progress-step.completed .step-dot {
   border-color: var(--accent-primary);
   background: var(--accent-primary);
-  color: #fff;
+  color: var(--md-on-primary);
 }
 
 #promptBuilderModal .step-label {
