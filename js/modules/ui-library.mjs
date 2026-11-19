@@ -579,4 +579,49 @@ export class UILibraryManager {
       ),
     ].join('\n\n');
   }
+
+  // ── Awesome Components (6,345 verified components) ──
+
+  async queryAwesomeCatalog({ q = '', category = 'all', page = 1, limit = 24 } = {}) {
+    if (typeof fetch !== 'function') {
+      return { items: [], total: 0, catalogTotal: 6345, page: 1, limit, totalPages: 1, categoryCounts: { all: 0 } };
+    }
+    const params = new URLSearchParams({
+      q: String(q || ''),
+      category: String(category || 'all'),
+      page: String(page || 1),
+      limit: String(limit || 24),
+    });
+    const res = await fetch(`/api/awesome-components?${params.toString()}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('Could not query Awesome Components catalog');
+    return res.json();
+  }
+
+  async fetchAwesomeComponentDetail(id) {
+    if (!id) throw new Error('Component id is required');
+    const res = await fetch(`/api/awesome-components/detail?id=${encodeURIComponent(id)}`, { cache: 'no-store' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || 'Could not load component source');
+    return data;
+  }
+
+  async fetchAwesomeAiMatches(promptText, limit = 2) {
+    if (typeof fetch !== 'function' || !promptText) return '';
+    try {
+      const res = await fetch(`/api/awesome-components/ai-match?q=${encodeURIComponent(promptText.slice(0, 300))}&limit=${limit}`);
+      if (!res.ok) return '';
+      const data = await res.json();
+      const matches = Array.isArray(data?.matches) ? data.matches : [];
+      if (!matches.length) return '';
+      return [
+        `## Matched Awesome Components References (from ${data.catalogTotal || 6345} indexed components)`,
+        ...matches.map((m) => [
+          `### ${m.name} (${m.category}, by ${m.authorName})`,
+          m.jsxSnippet ? `\`\`\`jsx\n${m.jsxSnippet}\n\`\`\`` : '',
+        ].filter(Boolean).join('\n')),
+      ].join('\n\n');
+    } catch {
+      return '';
+    }
+  }
 }

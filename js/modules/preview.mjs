@@ -5,6 +5,7 @@
  */
 
 import { isHtmlVfs } from './context-budget.mjs';
+import { SHADCN_TAILWIND_CONFIG_SCRIPT, SHADCN_THEME_VARS_CSS } from './ui-preview-builder.mjs';
 
 export class PreviewManager {
   constructor(callbacks = {}) {
@@ -427,7 +428,7 @@ export class PreviewManager {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://cdn.tailwindcss.com"></script>
+  ${SHADCN_TAILWIND_CONFIG_SCRIPT}
   <script src="https://unpkg.com/react@18.2.0/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js" crossorigin></script>
   <script>window.react = window.React; window.__WF_ORIGIN__ = ${JSON.stringify(appOrigin)};</script>
@@ -437,6 +438,7 @@ export class PreviewManager {
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" crossorigin></script>
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" crossorigin></script>
   <style>
+    ${SHADCN_THEME_VARS_CSS}
     body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #fff; min-height: 100vh; }
     #root { min-height: 100vh; }
   </style>

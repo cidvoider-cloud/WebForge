@@ -9,7 +9,7 @@
   <meta property="og:description" content="WebForge is a free, open-source AI website builder that runs in your browser. Chat a prompt, get a live React site preview.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:ital,wght@0,500..800;1,600..800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/prompt-builder.css">
   <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
@@ -94,71 +94,109 @@
       </header>
 
       <div class="home-scroll">
-        <section class="home-hero">
-          <h1 class="home-hero-title">Build interactive web apps locally.</h1>
-          <p class="home-hero-sub">Prompt your local or cloud LLM, attach UI screenshots, inspect diffs, and preview live React output in your browser.</p>
+        <section class="home-hero-stage" aria-label="Prompt builder">
+          <div class="home-horizon-backdrop" aria-hidden="true">
+            <div class="home-horizon-glow"></div>
+            <div class="home-horizon-planet"></div>
+          </div>
 
-          <div class="home-prompt-box">
-            <div class="attachments-row hidden" id="homeAttachmentsRow"></div>
-            <textarea id="homePromptInput" placeholder="Describe an app, dashboard, or landing page… (Paste or drop screenshots)" rows="2"></textarea>
-            <div class="home-prompt-actions">
-              <label class="composer-icon-btn" for="homeAttachInput" title="Attach image" aria-label="Attach image">
-                <i data-lucide="image-plus"></i>
-              </label>
-              <input type="file" id="homeAttachInput" accept="image/png,image/jpeg,image/webp,image/gif" multiple class="sr-only">
+          <div class="home-hero">
+            <button type="button" class="home-hero-announcement" id="btnHeroUiCatalog" title="Explore 6,345+ interactive UI components">
+              <i data-lucide="sparkles"></i>
+              <span>6,345+ UI Components</span>
+              <i data-lucide="arrow-right" class="home-hero-announcement-arrow"></i>
+            </button>
 
-              <button type="button" class="composer-icon-btn" id="btnOpenPromptBuilderHome" title="Prompt Builder" aria-label="Open Prompt Builder">
-                <i data-lucide="wand-sparkles"></i>
-              </button>
+            <h1 class="home-hero-title">What will you <em class="hero-accent-word">build</em> today?</h1>
+            <p class="home-hero-sub">Create stunning apps &amp; websites locally by chatting with AI.</p>
 
-              <div class="composer-tools-wrap" id="homeToolsWrap">
-                <button type="button" class="composer-icon-btn composer-tools-btn" id="btnHomeToolsMenu" aria-haspopup="true" aria-expanded="false" aria-label="Prompt settings: Web Search, Sub-Agents, System" title="Web Search, Sub-Agents & System">
-                  <i data-lucide="sliders-horizontal"></i>
-                  <span class="tools-active-dot" aria-hidden="true"></span>
+            <div class="home-prompt-box">
+              <div class="attachments-row hidden" id="homeAttachmentsRow"></div>
+              <textarea id="homePromptInput" placeholder="What do you want to build?" rows="3" aria-label="Describe what you want to build"></textarea>
+              <div class="home-prompt-actions">
+                <label class="composer-circle-btn" for="homeAttachInput" title="Attach image or screenshot" aria-label="Attach image">
+                  <i data-lucide="plus"></i>
+                </label>
+                <input type="file" id="homeAttachInput" accept="image/png,image/jpeg,image/webp,image/gif" multiple class="sr-only">
+
+                <button type="button" class="composer-model-btn" id="homeComposerModelBtn" title="Switch AI Provider &amp; Model" aria-label="Configure AI model">
+                  <i data-lucide="zap"></i>
+                  <span id="homeComposerModelLabel">Select model</span>
+                  <i data-lucide="chevron-down" class="composer-model-chevron"></i>
                 </button>
-                <div class="composer-tools-popover hidden" id="homeToolsPopover" role="menu" aria-label="Prompt controls">
-                  <div class="tools-popover-head">Agent &amp; Search Controls</div>
-                  <label class="tools-popover-toggle">
-                    <span class="tools-popover-icon"><i data-lucide="globe"></i></span>
-                    <span class="tools-popover-copy">
-                      <strong>Web Search</strong>
-                      <small>Free keyless search grounding</small>
-                    </span>
-                    <input type="checkbox" class="m3-switch m3-switch-sm" id="toggleHomeWebSearch" checked aria-label="Toggle Web Search">
-                  </label>
-                  <label class="tools-popover-toggle">
-                    <span class="tools-popover-icon"><i data-lucide="git-fork"></i></span>
-                    <span class="tools-popover-copy">
-                      <strong>Sub-Agents</strong>
-                      <small>Parallel builds, auto fallback</small>
-                    </span>
-                    <input type="checkbox" class="m3-switch m3-switch-sm" id="toggleHomeSubAgents" checked aria-label="Toggle Sub-Agents">
-                  </label>
-                  <div class="tools-popover-divider"></div>
-                  <button type="button" class="tools-popover-action" id="btnHomePopoverUiLibrary" role="menuitem">
-                    <span class="tools-popover-icon"><i data-lucide="blocks"></i></span>
-                    <span class="tools-popover-copy">
-                      <strong>UI Library</strong>
-                      <small id="homePopoverUiLibraryName">SaaS Modern</small>
-                    </span>
-                    <i data-lucide="chevron-right" class="tools-popover-chevron"></i>
-                  </button>
-                  <button type="button" class="tools-popover-action" id="btnHomePopoverSystem" role="menuitem">
-                    <span class="tools-popover-icon"><i data-lucide="sparkles"></i></span>
-                    <span class="tools-popover-copy">
-                      <strong>System &amp; Skills</strong>
-                      <small>Instructions, Ponytail &amp; GitHub skills</small>
-                    </span>
-                    <span class="tools-popover-badge tabular-nums" id="homePopoverSkillsCount">3</span>
-                    <i data-lucide="chevron-right" class="tools-popover-chevron"></i>
-                  </button>
-                </div>
-              </div>
 
-              <div class="spacer"></div>
-              <span class="token-hint tabular-nums" id="homeTokenHint">0 tok</span>
-              <button type="button" class="home-send-btn" id="homeSendBtn" aria-label="Build project from prompt">
-                <i data-lucide="arrow-up"></i>
+                <button type="button" class="composer-icon-btn composer-wand-btn" id="btnOpenPromptBuilderHome" title="Prompt Builder — Guided visual prompt wizard" aria-label="Open Prompt Builder">
+                  <i data-lucide="wand-sparkles"></i>
+                </button>
+
+                <div class="composer-tools-wrap" id="homeToolsWrap">
+                  <button type="button" class="composer-icon-btn composer-tools-btn" id="btnHomeToolsMenu" aria-haspopup="true" aria-expanded="false" aria-label="Prompt settings: Web Search, Sub-Agents, System" title="Web Search, Sub-Agents &amp; System">
+                    <i data-lucide="sliders-horizontal"></i>
+                    <span class="tools-active-dot" aria-hidden="true"></span>
+                  </button>
+                  <div class="composer-tools-popover hidden" id="homeToolsPopover" role="menu" aria-label="Prompt controls">
+                    <div class="tools-popover-head">Agent &amp; Search Controls</div>
+                    <label class="tools-popover-toggle">
+                      <span class="tools-popover-icon"><i data-lucide="globe"></i></span>
+                      <span class="tools-popover-copy">
+                        <strong>Web Search</strong>
+                        <small>Free keyless search grounding</small>
+                      </span>
+                      <input type="checkbox" class="m3-switch m3-switch-sm" id="toggleHomeWebSearch" checked aria-label="Toggle Web Search">
+                    </label>
+                    <label class="tools-popover-toggle">
+                      <span class="tools-popover-icon"><i data-lucide="git-fork"></i></span>
+                      <span class="tools-popover-copy">
+                        <strong>Sub-Agents</strong>
+                        <small>Parallel builds, auto fallback</small>
+                      </span>
+                      <input type="checkbox" class="m3-switch m3-switch-sm" id="toggleHomeSubAgents" checked aria-label="Toggle Sub-Agents">
+                    </label>
+                    <div class="tools-popover-divider"></div>
+                    <button type="button" class="tools-popover-action" id="btnHomePopoverUiLibrary" role="menuitem">
+                      <span class="tools-popover-icon"><i data-lucide="blocks"></i></span>
+                      <span class="tools-popover-copy">
+                        <strong>UI Library</strong>
+                        <small id="homePopoverUiLibraryName">SaaS Modern</small>
+                      </span>
+                      <i data-lucide="chevron-right" class="tools-popover-chevron"></i>
+                    </button>
+                    <button type="button" class="tools-popover-action" id="btnHomePopoverSystem" role="menuitem">
+                      <span class="tools-popover-icon"><i data-lucide="sparkles"></i></span>
+                      <span class="tools-popover-copy">
+                        <strong>System &amp; Skills</strong>
+                        <small>Instructions, Ponytail &amp; GitHub skills</small>
+                      </span>
+                      <span class="tools-popover-badge tabular-nums" id="homePopoverSkillsCount">3</span>
+                      <i data-lucide="chevron-right" class="tools-popover-chevron"></i>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="spacer"></div>
+                <span class="token-hint tabular-nums" id="homeTokenHint">0 tok</span>
+
+                <button type="button" class="composer-plan-btn" id="btnHomePlanToggle" aria-pressed="false" title="Toggle Plan Mode — Generate an editable plan before building">
+                  <i data-lucide="clipboard-list"></i>
+                  <span>Plan</span>
+                </button>
+
+                <button type="button" class="home-send-btn" id="homeSendBtn" aria-label="Build now">
+                  <span id="homeSendBtnLabel">Build now</span>
+                  <i data-lucide="send-horizontal"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="home-import-row" aria-label="Quick start sources">
+              <span class="home-import-label">or import from</span>
+              <button type="button" class="home-import-pill" id="btnHomeQuickUiLib">
+                <i data-lucide="blocks"></i>
+                <span>UI Library</span>
+              </button>
+              <button type="button" class="home-import-pill" id="btnHomeQuickGithub">
+                <i data-lucide="github"></i>
+                <span>GitHub</span>
               </button>
             </div>
           </div>
@@ -286,8 +324,13 @@
                 </label>
                 <input type="file" id="wsAttachInput" accept="image/png,image/jpeg,image/webp,image/gif" multiple class="sr-only">
 
-                <button type="button" class="composer-icon-btn" id="btnWsPromptBuilder" title="Prompt Builder" aria-label="Open Prompt Builder">
+                <button type="button" class="composer-icon-btn" id="btnWsPromptBuilder" title="Prompt Builder — Guided visual prompt wizard" aria-label="Open Prompt Builder">
                   <i data-lucide="wand-sparkles"></i>
+                </button>
+
+                <button type="button" class="ws-plan-toggle" id="btnWsPlanToggle" aria-pressed="false" title="Toggle Plan Mode — Generate an editable plan before building">
+                  <i data-lucide="clipboard-list"></i>
+                  <span>Plan</span>
                 </button>
 
                 <div class="composer-tools-wrap" id="wsToolsWrap">
@@ -890,12 +933,112 @@
         <!-- Library Detail Header -->
         <div class="ui-lib-detail-head" id="uiLibDetailHead"></div>
 
+        <!-- Remote Catalog Search Bar (Awesome Components 6,591+ library) -->
+        <div class="ui-lib-search-row hidden" id="uiLibSearchBar"></div>
+
         <!-- Category Filter Tabs (All + 12 Essential UI Building Blocks) -->
         <div class="ui-lib-cat-bar" id="uiLibCategoryBar" role="tablist" aria-label="UI element categories"></div>
 
         <!-- Live Rendered Element Gallery -->
         <div class="ui-lib-elements-grid" id="uiLibElementsGrid"></div>
       </section>
+    </div>
+  </dialog>
+
+  <!-- ============ FULLSCREEN ANIMATED INTERACTIVE UI PREVIEWER ============ -->
+  <dialog id="uiFullscreenPreviewModal" class="ui-fs-modal" aria-label="Fullscreen Interactive UI Preview">
+    <header class="ui-fs-topbar">
+      <div class="ui-fs-title-group">
+        <div class="ui-fs-title-row">
+          <h3 id="uiFsTitle">Component Preview</h3>
+          <span class="ui-fs-badge" id="uiFsLibBadge">Library</span>
+          <span class="ui-fs-cat" id="uiFsCatBadge">Category</span>
+        </div>
+        <div class="ui-fs-sub" id="uiFsSubline">Interactive animated preview</div>
+      </div>
+
+      <div class="ui-fs-controls">
+        <div class="ui-fs-seg" role="tablist" aria-label="Preview view mode">
+          <button type="button" role="tab" aria-selected="true" class="ui-fs-seg-btn active" data-fs-mode="preview">
+            <i data-lucide="play"></i><span>Preview</span>
+          </button>
+          <button type="button" role="tab" aria-selected="false" class="ui-fs-seg-btn hidden" id="btnUiFsModeReference" data-fs-mode="reference">
+            <i data-lucide="image"></i><span>Reference</span>
+          </button>
+          <button type="button" role="tab" aria-selected="false" class="ui-fs-seg-btn" data-fs-mode="split">
+            <i data-lucide="columns-2"></i><span>Split</span>
+          </button>
+          <button type="button" role="tab" aria-selected="false" class="ui-fs-seg-btn" data-fs-mode="code">
+            <i data-lucide="code-2"></i><span>Code</span>
+          </button>
+        </div>
+
+        <div class="ui-fs-seg ui-fs-viewport-seg" id="uiFsViewportSeg" role="group" aria-label="Viewport size">
+          <button type="button" class="ui-fs-seg-btn active" data-fs-vp="desktop" title="Desktop width" aria-label="Desktop viewport">
+            <i data-lucide="monitor"></i>
+          </button>
+          <button type="button" class="ui-fs-seg-btn" data-fs-vp="tablet" title="Tablet width (768px)" aria-label="Tablet viewport">
+            <i data-lucide="tablet"></i>
+          </button>
+          <button type="button" class="ui-fs-seg-btn" data-fs-vp="mobile" title="Mobile width (390px)" aria-label="Mobile viewport">
+            <i data-lucide="smartphone"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="ui-fs-actions">
+        <button type="button" class="btn btn-ghost btn-sm" id="btnUiFsReplay" title="Replay entrance animation">
+          <i data-lucide="rotate-ccw"></i><span>Replay</span>
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm" id="btnUiFsTheme" title="Toggle preview dark/light canvas" aria-label="Toggle preview theme">
+          <i data-lucide="sun"></i><span id="uiFsThemeLabel">Light</span>
+        </button>
+        <button type="button" class="btn btn-outline btn-sm" id="btnUiFsCopy">
+          <i data-lucide="copy"></i><span>Copy Code</span>
+        </button>
+        <button type="button" class="btn btn-primary btn-sm hidden" id="btnUiFsBuildAi" title="Send prompt.md to AI Builder to generate full live React/JS version">
+          <i data-lucide="sparkles"></i><span>Build with AI</span>
+        </button>
+        <button type="button" class="btn btn-primary btn-sm hidden" id="btnUiFsInsert">
+          <i data-lucide="file-plus"></i><span>Insert</span>
+        </button>
+        <button type="button" class="modal-close" id="btnUiFsClose" aria-label="Close fullscreen preview">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+    </header>
+
+    <div class="ui-fs-body mode-preview" id="uiFsBody">
+      <div class="ui-fs-preview-pane" id="uiFsPreviewPane">
+        <div class="ui-fs-stage-frame vp-desktop" id="uiFsStageFrame">
+          <div class="ui-fs-loading hidden" id="uiFsLoading">
+            <i data-lucide="loader-2"></i>
+            <span>Loading interactive preview…</span>
+          </div>
+          <iframe id="uiFsIframe" class="ui-fs-iframe" title="Interactive component preview" sandbox="allow-scripts allow-same-origin"></iframe>
+          <div class="ui-fs-reference-view hidden" id="uiFsReferenceView">
+            <img id="uiFsReferenceImg" class="ui-fs-reference-img" alt="Original GitHub component reference" referrerpolicy="no-referrer" />
+            <div class="ui-fs-reference-caption" id="uiFsReferenceCaption">
+              Original GitHub reference capture (screenshot.png)
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ui-fs-code-pane" id="uiFsCodePane">
+        <div class="ui-fs-code-head">
+          <div class="ui-fs-code-tabs" id="uiFsCodeTabs" role="tablist" aria-label="Code tabs"></div>
+          <div class="ui-fs-code-head-actions">
+            <a class="btn btn-ghost btn-sm hidden" id="uiFsRepoLink" target="_blank" rel="noopener noreferrer">
+              <i data-lucide="external-link"></i><span>GitHub</span>
+            </a>
+            <button type="button" class="btn btn-outline btn-sm" id="btnUiFsCodeCopy">
+              <i data-lucide="copy"></i><span>Copy</span>
+            </button>
+          </div>
+        </div>
+        <pre class="ui-fs-code-pre"><code id="uiFsCodeContent"></code></pre>
+      </div>
     </div>
   </dialog>
 

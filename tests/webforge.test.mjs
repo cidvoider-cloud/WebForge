@@ -559,7 +559,7 @@ test('checkpoints persist beforeFiles snapshot for exact pre-edit rollback', () 
   assert.equal(loaded.files['src/App.jsx'], 'const color = "red";');
 });
 
-test('UILibraryManager ships 7 built-in packs (including 21st.dev), bundles kits, builds prompt guides, and supports custom CRUD + JSON I/O', async () => {
+test('UILibraryManager ships 8 built-in packs (including 21st.dev & Awesome Components), bundles kits, builds prompt guides, and supports custom CRUD + JSON I/O', async () => {
   localStorage.clear();
   const {
     UILibraryManager,
@@ -568,16 +568,19 @@ test('UILibraryManager ships 7 built-in packs (including 21st.dev), bundles kits
     extractElementFromProjectFile,
   } = await import('../js/modules/ui-library.mjs');
 
-  assert.equal(BUILT_IN_UI_LIBRARIES.length, 7);
+  assert.equal(BUILT_IN_UI_LIBRARIES.length, 8);
   assert.equal(UI_ELEMENT_CATEGORIES.length, 12);
   assert.deepEqual(
     BUILT_IN_UI_LIBRARIES.map((l) => l.id),
-    ['saas-modern', 'pixel-retro', 'minimal-luxury', 'neo-brutalist', 'glassmorphism', 'enterprise-m3', '21st-dev']
+    ['saas-modern', 'pixel-retro', 'minimal-luxury', 'neo-brutalist', 'glassmorphism', 'enterprise-m3', '21st-dev', 'awesome-components']
   );
 
   for (const pack of BUILT_IN_UI_LIBRARIES) {
     if (pack.id === '21st-dev') {
       assert.ok(pack.elements.length >= 2, '21st-dev must include Glass Folder Cards and Showcase');
+    } else if (pack.id === 'awesome-components') {
+      assert.equal(pack.isRemoteCatalog, true, 'awesome-components must be a remote catalog pack');
+      assert.equal(pack.catalogCount, 6345, 'awesome-components must expose 6,345 verified working components');
     } else {
       assert.equal(pack.elements.length, 12, `${pack.id} must cover all 12 core UI categories`);
     }
@@ -759,6 +762,296 @@ test('AI template queue store persists, validates, updates, deletes, and builds 
   }
 });
 
+test('Awesome Components catalog loads 6,345 verified items (excluding broken upstream error scrapes), searches, paginates, computes counts, and converts HTML snapshots to React JSX', async () => {
+  const path = await import('node:path');
+  const {
+    AWESOME_INDEX_REL_PATH,
+    loadAwesomeCatalog,
+    searchAwesomeCatalog,
+    computeCategoryCounts,
+    htmlSnapshotToReactComponent,
+    isBrokenRenderedHtml,
+  } = await import('../tools/awesome-components.mjs');
 
+  const indexPath = path.join(process.cwd(), AWESOME_INDEX_REL_PATH);
+  const catalog = loadAwesomeCatalog(indexPath);
+  assert.equal(catalog.length, 6345, 'Must index all 6,345 verified working components from wundercorp/awesome-components');
+  assert.equal(catalog.some((c) => c.id === '0-9/0xurvish/expandable-gallery/default'), false, 'Broken upstream error-page scrape must be excluded');
+  assert.equal(catalog.some((c) => c.id === '0-9/0xurvish/bucket/default'), false, 'Empty 0-byte scrape must be excluded');
+  assert.equal(catalog.some((c) => c.id === '0-9/0xurvish/dynamic-toolbar/default'), true, 'Valid working component must be kept');
+
+  assert.equal(isBrokenRenderedHtml('<html><body>Something went wrong — The page failed to render</body></html>'), true);
+  assert.equal(isBrokenRenderedHtml('<div id="root"></div>'), true);
+  assert.equal(isBrokenRenderedHtml('<div id="root"><button class="px-4 py-2">Click</button></div>'), false);
+  assert.equal(
+    isBrokenRenderedHtml('<div aria-label="iPhone mockup (14-pro)" style="width: 417px; height: 876px; border-radius: 68px; background: #111;"></div>'),
+    false,
+    'Pure-CSS visual frames like iPhone Mockup must NOT be flagged as broken'
+  );
+
+  const counts = computeCategoryCounts(catalog);
+  assert.equal(counts.all, 6345);
+  const summed = Object.entries(counts)
+    .filter(([k]) => k !== 'all')
+    .reduce((acc, [, v]) => acc + v, 0);
+  assert.equal(summed, 6345, 'Category counts must sum exactly to 6,345');
+
+  const bento = searchAwesomeCatalog(catalog, { q: 'bento', category: 'all', page: 1, limit: 24 });
+  assert.ok(bento.total > 10, `Expected >10 bento components, got ${bento.total}`);
+  assert.equal(bento.items.length, Math.min(24, bento.total));
+  assert.ok(bento.items[0].screenshotUrl.startsWith('https://raw.githubusercontent.com/wundercorp/awesome-components/main/components/'));
+
+  const loginForms = searchAwesomeCatalog(catalog, { q: 'login', category: 'forms', page: 1, limit: 12 });
+  assert.ok(loginForms.total > 5, 'Expected login components in forms category');
+  assert.ok(loginForms.items.every((item) => item.category === 'forms'));
+
+  const page2 = searchAwesomeCatalog(catalog, { q: '', category: 'all', page: 2, limit: 24 });
+  assert.equal(page2.page, 2);
+  assert.equal(page2.items.length, 24);
+  assert.notEqual(page2.items[0].id, catalog[0].id);
+
+  const jsx = htmlSnapshotToReactComponent(
+    'Bento Grid Card',
+    '<!DOCTYPE html><html><head><link rel="stylesheet" href="/_next/static/css/dead.css"></head><body><div id="root"><div class="w-screen min-h-screen flex justify-center items-center"><section class="p-4 bg-card" style="background-color: #111; border-radius: 12px"><img src="https://www.thiings.co/_next/image?url=https%3A%2F%2Fimages.unsplash.com%2Fphoto-1&amp;w=640&amp;q=75" alt="Demo"><img src="https://images.unsplash.com/photo-2?q=80&amp;w=1200" alt="Hero"><label for="em">Email</label><input id="em" type="email" readonly><svg viewbox="0 0 24 24"><path stroke-width="2" fill-rule="evenodd" d="M0 0"></path></svg><number-flow-react></number-flow-react><p>Price: {42}</p></section></div></div></body></html>'
+  );
+  assert.ok(jsx.includes('export function BentoGridCard()'));
+  assert.ok(!jsx.includes('<!DOCTYPE') && !jsx.includes('/_next/static/css/dead.css'), 'Should extract clean body from full HTML docs');
+  assert.ok(!jsx.includes('w-screen') && !jsx.includes('min-h-screen'), 'Should unwrap BuilderStudio outer viewport harness divs');
+  assert.ok(jsx.includes('https://images.unsplash.com/photo-1'), 'Should unwrap full-origin /_next/image proxy URLs');
+  assert.ok(jsx.includes('https://images.unsplash.com/photo-2?q=80&w=1200'), 'Should decode &amp; in JSX image src URLs');
+  assert.ok(jsx.split('\n').length >= 15, 'Generated JSX should be formatted across indented lines instead of minified onto one line');
+  assert.ok(jsx.includes('className="p-4 bg-card"'));
+  assert.ok(jsx.includes('htmlFor="em"'));
+  assert.ok(jsx.includes('readOnly'));
+  assert.ok(jsx.includes('style={{ backgroundColor: "#111", borderRadius: "12px" }}'));
+  assert.ok(jsx.includes('strokeWidth="2"'));
+  assert.ok(jsx.includes('fillRule="evenodd"'));
+  assert.ok(jsx.includes('viewBox="0 0 24 24"'));
+  assert.ok(jsx.includes('<input id="em" type="email" readOnly />'));
+  assert.ok(jsx.includes('&#123;42&#125;'));
+});
+
+test('buildInteractivePreviewSrcdoc generates high-fidelity Tailwind v4/shadcn, built-in, and JSX previews', async () => {
+  const {
+    buildInteractivePreviewSrcdoc,
+    sanitizeAwesomeRenderedHtml,
+    unwrapNextImageUrls,
+    isCanvasOnlySnapshot,
+    isDarkSurfaceSnapshot,
+  } = await import('../js/modules/ui-preview-builder.mjs');
+
+  assert.equal(
+    unwrapNextImageUrls('<img src="https://www.thiings.co/_next/image?url=https%3A%2F%2Fcdn.example.com%2Fpic.jpg&amp;w=800&amp;q=75">'),
+    '<img src="https://cdn.example.com/pic.jpg">'
+  );
+
+  // Canvas-only & dark-surface detection (e.g. Siri Wave vs Hero Shader vs light Card)
+  const siriWaveHtml = '<div class="flex min-h-screen w-full items-center justify-center bg-[#0a0a0c] p-8"><canvas class="block rounded-[20px] bg-black" width="270" height="270" style="width: 360px; height: 360px;"></canvas></div>';
+  assert.equal(isCanvasOnlySnapshot(siriWaveHtml), true, 'Pure <canvas> snapshot like Siri Wave must be detected');
+  assert.equal(isDarkSurfaceSnapshot(siriWaveHtml), true, 'Dark canvas snapshot must trigger dark preview stage');
+  assert.equal(isCanvasOnlySnapshot('<div><canvas></canvas><h1>Beautiful Design</h1><button>Start</button></div>'), false, 'Hybrid DOM + canvas hero must NOT be classified as canvas-only');
+  assert.equal(isDarkSurfaceSnapshot('<section class="bg-white text-black bg-black/5"><button>Light</button></section>'), false, 'Low-opacity bg-black/5 button tint must not trigger dark mode');
+
+  const siriDoc = buildInteractivePreviewSrcdoc({
+    lib: { id: 'awesome-components', name: 'Awesome Components' },
+    element: {
+      name: 'Siri Wave',
+      renderedHtml: siriWaveHtml,
+      screenshotUrl: 'https://raw.githubusercontent.com/wundercorp/awesome-components/main/components/0-9/40973894/siri-wave/default/screenshot.png',
+    },
+    theme: 'dark',
+    animate: true,
+  });
+  assert.ok(siriDoc.includes('var WF_CANVAS_ONLY = true;'), 'Pure canvas preview must enable authentic reference canvas mode');
+  assert.ok(siriDoc.includes('siri-wave/default/screenshot.png'), 'Pure canvas preview must embed its original reference screenshot URL');
+  // Parse inline runtime <script> to guarantee zero JS syntax/regex-escape errors inside preview iframes
+  const inlineScripts = [...siriDoc.matchAll(/<script>([\s\S]*?)<\/script>/gi)].map((m) => m[1]);
+  assert.ok(inlineScripts.length >= 1, 'Preview must emit inline interactive runtime script');
+  for (const scriptBody of inlineScripts) {
+    new Function(scriptBody);
+  }
+
+  // 1. Awesome Components full HTML document + Tailwind v4 / opacity / Shadow-DOM hydration / image fallback / full-bleed height / collapsed fan-deck rescue
+  const fullDocHtml = `<!DOCTYPE html><html><head><link rel="stylesheet" href="/_next/static/css/abc.css"><style>.custom-glow { opacity: 1; }</style></head><body><div id="root"><div class="w-screen min-h-screen flex justify-center items-center"><section class="h-screen w-screen bg-primary/10 border-foreground/10 rounded-4xl bg-linear-to-t from-black/20"><canvas width="1200" height="800"></canvas><img src="/_next/image?url=https%3A%2F%2Fimages.unsplash.com%2Fhero.jpg&w=800"><number-flow-react></number-flow-react><button>Explore</button></section></div></div></body></html>`;
+  const sanitized = sanitizeAwesomeRenderedHtml(fullDocHtml);
+  assert.ok(!sanitized.bodyHtml.includes('<!DOCTYPE') && !sanitized.bodyHtml.includes('/_next/static/css'), 'Must strip full-doc wrapper and dead _next links');
+  assert.ok(!sanitized.bodyHtml.includes('w-screen'), 'Must peel BuilderStudio outer viewport harness');
+  assert.ok(sanitized.bodyHtml.includes('h-[640px]'), 'Must preserve full-bleed component height instead of collapsing h-screen to 0px');
+  assert.ok(sanitized.bodyHtml.includes('https://images.unsplash.com/hero.jpg'), 'Must unwrap _next/image URLs');
+  assert.ok(sanitized.bodyHtml.includes('referrerpolicy="no-referrer"'), 'Must add no-referrer to external images');
+  assert.ok(sanitized.extraCss.includes('.custom-glow'), 'Must preserve safe inline <style> rules');
+
+  const awesomeDoc = buildInteractivePreviewSrcdoc({
+    lib: { id: 'awesome-components', name: 'Awesome Components' },
+    element: {
+      name: 'Vertical Tabs',
+      renderedHtml: fullDocHtml,
+    },
+    theme: 'light',
+    animate: true,
+  });
+  assert.ok(awesomeDoc.includes('@tailwindcss/browser@4'), 'Must use native Tailwind CSS v4 Browser CDN');
+  assert.ok(awesomeDoc.includes('@custom-variant dark'), 'Must configure Tailwind v4 class-based dark mode');
+  assert.ok(awesomeDoc.includes('--color-primary: hsl(var(--primary));'), 'Must map shadcn colors into Tailwind v4 @theme inline');
+  assert.ok(awesomeDoc.includes('--blue-500: #3b82f6;'), 'Must expose Aceternity UI color variables for Aurora/Gradient backgrounds');
+  assert.ok(awesomeDoc.includes('--gradient-background-start:'), 'Must provide default CSS vars for Background Gradient Animation');
+  assert.ok(awesomeDoc.includes('--animate-first:'), 'Must include Aceternity gradient orb animations');
+  assert.ok(awesomeDoc.includes('bg-grid-white'), 'Must include grid/dot background utilities');
+  assert.ok(awesomeDoc.includes('wireImageFallbacks'), 'Must include broken-image SVG fallback handler');
+  assert.ok(awesomeDoc.includes('unfreezeHiddenScrollElements'), 'Must unfreeze Framer Motion opacity:0 elements');
+  assert.ok(awesomeDoc.includes('hydrateShadowCustomElements'), 'Must hydrate empty <number-flow-react> elements');
+  assert.ok(awesomeDoc.includes('hydrateEmptyCanvases'), 'Must handle empty WebGL/shader <canvas> elements');
+  assert.ok(awesomeDoc.includes('healCollapsedMediaContainers'), 'Must rescue 0x0 image containers whose external CSS classes were omitted');
+  assert.ok(awesomeDoc.includes('rotateFanDeck'), 'Must wire live prev/next rotation for rescued fan card carousels');
+  assert.ok(awesomeDoc.includes('data-preview-theme="light"'));
+  assert.ok(awesomeDoc.includes('wf-replay-animation'));
+  assert.ok(awesomeDoc.includes('wf-set-theme'));
+
+  // 2. Built-in / 21st.dev previewHtml + previewScript
+  const builtinDoc = buildInteractivePreviewSrcdoc({
+    lib: { id: '21st-dev', name: '21st.dev', tokensCss: ':root { --wf-bg: #000; }', fontsUrl: 'https://fonts.googleapis.com/css2?family=Inter' },
+    element: {
+      name: 'Glass Folder Cards',
+      previewHtml: '<div class="gf-demo"><button id="gfAdd">Add</button></div>',
+      previewCss: '.gf-demo { display: flex; }',
+      previewScript: 'console.log("folder-ready");',
+    },
+    theme: 'dark',
+    animate: true,
+  });
+  assert.ok(builtinDoc.includes('https://fonts.googleapis.com/css2?family=Inter'));
+  assert.ok(builtinDoc.includes('folder-ready'));
+  assert.ok(builtinDoc.includes('@keyframes wfRevealUp'));
+
+  // 3. Code-only React JSX component fallback
+  const jsxDoc = buildInteractivePreviewSrcdoc({
+    lib: { id: 'custom-1', name: 'Custom Pack', tokensCss: '' },
+    element: {
+      name: 'Status Pill',
+      code: 'export function StatusPill() { return <span className="text-xs">Live</span>; }',
+    },
+    theme: 'dark',
+  });
+  assert.ok(jsxDoc.includes('babel.min.js'));
+  assert.ok(jsxDoc.includes('react.production.min.js'));
+  assert.ok(jsxDoc.includes('StatusPill'));
+});
+
+test('Plan Mode engine builds system directives, offline draft plans, approval prompts, and XSS-safe Markdown HTML', async () => {
+  const {
+    buildPlanModeSystemDirective,
+    buildOfflineDraftPlan,
+    buildApprovedPlanExecutionPrompt,
+    formatPlanMarkdownToHtml,
+  } = await import('../js/modules/plan-mode.mjs');
+
+  const directive = buildPlanModeSystemDirective('Base WebForge Prompt');
+  assert.ok(directive.includes('Base WebForge Prompt'));
+  assert.ok(directive.includes('PLAN MODE ACTIVE'));
+  assert.ok(directive.includes('NEVER output ### FILE: blocks'));
+
+  const draft = buildOfflineDraftPlan('Minimalist coffee roastery storefront', 'Minimal Luxury');
+  assert.ok(draft.includes('## Goal'));
+  assert.ok(draft.includes('Minimalist coffee roastery storefront'));
+  assert.ok(draft.includes('Minimal Luxury'));
+  assert.ok(draft.includes('## Planned Files'));
+
+  const execPrompt = buildApprovedPlanExecutionPrompt('Coffee storefront', '## Goal\nShip storefront');
+  assert.ok(execPrompt.includes('APPROVED'));
+  assert.ok(execPrompt.includes('Coffee storefront'));
+  assert.ok(execPrompt.includes('Ship storefront'));
+
+  const renderedHtml = formatPlanMarkdownToHtml('## Goal\nBuild **fast** `App.jsx` <script>alert(1)</script>\n- Item *one*');
+  assert.ok(renderedHtml.includes('<h3 class="plan-md-h3">Goal</h3>'));
+  assert.ok(renderedHtml.includes('<strong>fast</strong>'));
+  assert.ok(renderedHtml.includes('<code>App.jsx</code>'));
+  assert.ok(!renderedHtml.includes('<script>alert(1)</script>'), 'Must escape raw script tags');
+  assert.ok(renderedHtml.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));
+  assert.ok(renderedHtml.includes('<li>Item <em>one</em></li>'));
+});
+
+test('Awesome Components 5-category fidelity helpers extract prompt.md CSS, heal media/glow/accents/mobile frames, and emit valid preview JS', async () => {
+  const { extractStyleHintsFromPrompt } = await import('../tools/awesome-components.mjs');
+  const {
+    buildInteractivePreviewSrcdoc,
+    unwrapNextImageUrls,
+    isMobileComponentSnapshot,
+    needsVibrantPrimaryAccent,
+  } = await import('../js/modules/ui-preview-builder.mjs');
+
+  // 1. prompt.md CSS extraction
+  const samplePromptMd = [
+    '# Glowing Button',
+    '```css',
+    '@property --gradient-angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }',
+    ':root { --glow-color: #f59e0b; --brand: 38 92% 50%; }',
+    '@keyframes pulse-border { 0% { opacity: 0.6; } 100% { opacity: 1; } }',
+    '```',
+  ].join('\n');
+  const extractedCss = extractStyleHintsFromPrompt(samplePromptMd);
+  assert.ok(extractedCss.includes('@property --gradient-angle'));
+  assert.ok(extractedCss.includes('--glow-color: #f59e0b'));
+  assert.ok(extractedCss.includes('@keyframes pulse-border'));
+
+  // 2. Unwrapping CSS background-image /_next/image & promoting data-src over 1x1 GIF
+  const unwrappedBg = unwrapNextImageUrls(
+    '<div style="background-image: url(\'/_next/image?url=https%3A%2F%2Fcdn.test%2Fbg.png&amp;w=1200\')"></div><img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-src="https://cdn.test/real.jpg" srcset="/_next/image?url=foo 1x">'
+  );
+  assert.ok(unwrappedBg.includes('https://cdn.test/bg.png'), 'Should unwrap CSS url() _next/image');
+  assert.ok(unwrappedBg.includes('src="https://cdn.test/real.jpg"'), 'Should promote data-src over 1x1 blank GIF');
+  assert.ok(!unwrappedBg.includes('srcset='), 'Should strip broken srcset attributes');
+
+  // 3. Mobile / phone snapshot detection
+  assert.equal(
+    isMobileComponentSnapshot('<div class="md:hidden fixed bottom-0"><nav>Home</nav></div>', 'Bottom Nav'),
+    true,
+    'Desktop-hidden md:hidden root must trigger mobile viewport'
+  );
+  assert.equal(
+    isMobileComponentSnapshot('<div style="width: 417px; height: 876px;"><div style="inset: 59px 0px 34px;"></div></div>', 'iPhone Mockup'),
+    true,
+    'iPhone Mockup must trigger mobile viewport'
+  );
+  assert.equal(
+    isMobileComponentSnapshot('<header class="w-full max-w-7xl flex"><nav class="lg:flex hidden"><a>Home</a></nav><div class="lg:hidden">Drawer</div></header>', 'Resizable Navbar'),
+    false,
+    'Desktop navbar with lg:flex hidden (any class order) and lg:hidden mobile drawer must stay desktop'
+  );
+
+  // 4. Vibrant landing-page accent detection
+  assert.equal(
+    needsVibrantPrimaryAccent('<section class="bg-primary text-primary-foreground"><a class="from-primary to-primary/60">Start</a></section>'),
+    true
+  );
+  assert.equal(
+    needsVibrantPrimaryAccent('<section class="bg-emerald-500 text-white"><button class="bg-primary">Go</button></section>'),
+    false,
+    'Components that already specify explicit brand Tailwind hues should keep their own palette'
+  );
+
+  // 5. Full preview generation with promptCss + glow + mobile + header nav runtime validation
+  const previewDoc = buildInteractivePreviewSrcdoc({
+    lib: { id: 'awesome-components', name: 'Awesome Components' },
+    element: {
+      name: 'Glowing Landing Header',
+      renderedHtml: '<header class="w-full flex"><nav class="flex gap-4"><a href="#features">Features</a><a href="#pricing">Pricing</a></nav><button class="bg-primary shiny-cta" style="--glow-color:#f59e0b">Launch</button></header>',
+      promptCss: extractedCss,
+    },
+    theme: 'dark',
+    animate: true,
+  });
+  assert.ok(previewDoc.includes('--glow-color: #f59e0b'), 'Must inject extracted promptCss');
+  assert.ok(previewDoc.includes('hydrateGlowEffects'), 'Must include glow hydration runtime');
+  assert.ok(previewDoc.includes('rescueMobileAndPhoneViews'), 'Must include mobile/phone rescue runtime');
+  assert.ok(previewDoc.includes('findOptionGroup'), 'Must include multi-option header/nav click handler');
+  assert.ok(previewDoc.includes('toggleHeaderDropdown'), 'Must include header dropdown toggle handler');
+
+  // Verify every emitted inline <script> parses cleanly in JS engine
+  const scripts = [...previewDoc.matchAll(/<script>([\s\S]*?)<\/script>/gi)].map((m) => m[1]);
+  assert.ok(scripts.length >= 1);
+  for (const s of scripts) {
+    new Function(s);
+  }
+});
 
 

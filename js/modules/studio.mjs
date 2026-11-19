@@ -56,6 +56,12 @@ import {
   removeProjectThumbnail,
   capturePreviewThumbnail,
 } from './thumbnails.mjs';
+import {
+  buildPlanModeSystemDirective,
+  buildOfflineDraftPlan,
+  buildApprovedPlanExecutionPrompt,
+  formatPlanMarkdownToHtml,
+} from './plan-mode.mjs';
 
 const GEN_JOB_MAX_AGE_MS = 45 * 60 * 1000;
 
@@ -171,8 +177,10 @@ export class WebForgeStudio {
     this.agentPrefs = {
       webSearch: savedAgentPrefs?.webSearch !== undefined ? !!savedAgentPrefs.webSearch : true,
       subAgents: savedAgentPrefs?.subAgents !== undefined ? !!savedAgentPrefs.subAgents : true,
+      planMode: savedAgentPrefs?.planMode !== undefined ? !!savedAgentPrefs.planMode : false,
     };
     this._subAgentAbort = null;
+    this._pendingPlans = new Map();
   }
 
   init() {
@@ -274,8 +282,51 @@ export class WebForgeStudio {
       const el = document.getElementById(id);
       if (el) el.checked = this.agentPrefs.subAgents;
     });
+    this._syncPlanModeUI();
     this._syncPopoverSkillCounts();
     this.syncUiLibraryIndicators();
+  }
+
+  togglePlanMode(force) {
+    this.agentPrefs.planMode = typeof force === 'boolean' ? force : !this.agentPrefs.planMode;
+    this._saveAgentPrefs();
+    this._syncPlanModeUI();
+    this.showToast(
+      this.agentPrefs.planMode
+        ? 'Plan Mode ON — AI will draft an editable plan before building'
+        : 'Plan Mode OFF — Direct build mode'
+    );
+  }
+
+  _syncPlanModeUI() {
+    const enabled = Boolean(this.agentPrefs.planMode);
+    ['btnHomePlanToggle', 'btnWsPlanToggle'].forEach((id) => {
+      const btn = document.getElementById(id);
+      if (btn) {
+        btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+        btn.classList.toggle('active', enabled);
+      }
+    });
+    const homeSendLbl = document.getElementById('homeSendBtnLabel');
+    if (homeSendLbl) {
+      homeSendLbl.textContent = enabled ? 'Create plan' : 'Build now';
+    }
+    const homeSendBtn = document.getElementById('homeSendBtn');
+    if (homeSendBtn) {
+      homeSendBtn.setAttribute('aria-label', enabled ? 'Create implementation plan' : 'Build now');
+    }
+    const homeInput = document.getElementById('homePromptInput');
+    if (homeInput) {
+      homeInput.placeholder = enabled
+        ? 'Describe what you want to plan first… (Review & edit before building)'
+        : 'What do you want to build?';
+    }
+    const wsInput = document.getElementById('chatInput');
+    if (wsInput) {
+      wsInput.placeholder = enabled
+        ? 'Plan Mode ON — describe what to architect before coding…'
+        : 'Describe changes, paste a screenshot, or debug… (Enter to Send)';
+    }
   }
 
   syncUiLibraryIndicators() {
@@ -414,10 +465,17 @@ export class WebForgeStudio {
 
   _updateHomeStatusStrip() {
     const modelLabel = document.getElementById('homeModelLabel');
+    const shortModelText = this.provider.model
+      ? this.provider.model.split('/').pop()
+      : 'Select model';
     if (modelLabel) {
       modelLabel.textContent = this.provider.model
         ? `${this.provider.preset.name} · ${this.provider.model}`
         : `${this.provider.preset.name} · Select model`;
+    }
+    const composerModelLabel = document.getElementById('homeComposerModelLabel');
+    if (composerModelLabel) {
+      composerModelLabel.textContent = shortModelText;
     }
     const promptVal = document.getElementById('homePromptInput')?.value || '';
     const uiGuide = this.uiLibraryManager?.buildPromptGuide() || '';
@@ -2389,10 +2447,228 @@ export class WebForgeStudio {
     }
   }
 
+  // ── True Plan Mode (Draft → Edit → Approve & Build) ──
+
+  async _runPlanModeTurn(finalMsg) {
+    const input = document.getElementById('chatInput');
+    const attachments = this.wsAttachments.slice();
+    const attHtml = attachments.length
+      ? `<div class="msg-attachments">${attachments.map((a) => `<img src="${escapeHtml(a.dataUrl)}" alt="${escapeHtml(a.name)}">`).join('')}</div>`
+      : '';
+    this._addMessageBubble('user', `${attHtml}<div>${escapeHtml(finalMsg)}</div>`, { rawText: finalMsg });
+    if (input) {
+      input.value = '';
+      input.style.height = 'auto';
+    }
+    this.wsAttachments = [];
+    this._renderAttachments('ws');
+    this._saveChatHistory();
+
+    const planId = 'plan-' + generateId();
+    const activeProj = this._getActiveProject();
+    const activeUiLib = this.uiLibraryManager.getActiveLibrary();
+    const planRecord = {
+      id: planId,
+      originalPrompt: finalMsg,
+      attachments,
+      planText: '',
+      status: 'streaming', // streaming | ready | approved | discarded
+      editing: false,
+      note: '',
+    };
+    this._pendingPlans.set(planId, planRecord);
+
+    const aiBubbleId = this._addMessageBubble('ai', `<div class="plan-card" data-plan-id="${planId}"></div>`);
+    const bubbleEl = aiBubbleId ? document.getElementById(aiBubbleId) : null;
+    this._renderPlanCard(bubbleEl, planRecord);
+
+    const hasModel = Boolean(this.provider?.model);
+    const preset = PROVIDER_PRESETS[this.provider?.type] || {};
+    const hasKeyOrLocal = !preset.needsKey || Boolean(this.provider?.apiKey);
+
+    if (!hasModel || !hasKeyOrLocal) {
+      planRecord.planText = buildOfflineDraftPlan(finalMsg, activeUiLib?.name || '');
+      planRecord.status = 'ready';
+      planRecord.note = 'Draft plan generated locally (configure a model in Model & Provider to draft with AI). Edit any section below, then click Approve & Build.';
+      this._renderPlanCard(bubbleEl, planRecord);
+      this._saveChatHistory();
+      return;
+    }
+
+    try {
+      this.isGenerating = true;
+      this._userStoppedGeneration = false;
+      this._updateGeneratingUI(true);
+
+      const uiLibraryGuide = activeUiLib ? this.uiLibraryManager.buildPromptGuide(activeUiLib.id) : '';
+      const baseSystemPrompt = this.skillManager.getSystemPrompt(activeProj?.customInstructions || '');
+      const fullBase = uiLibraryGuide ? `${baseSystemPrompt}\n\n${uiLibraryGuide}` : baseSystemPrompt;
+      const planSystemPrompt = buildPlanModeSystemDirective(fullBase);
+      const userPayload = buildChatMessageContent(
+        `Create a concise, editable implementation plan for:\n\n${finalMsg}`,
+        attachments
+      );
+
+      let lastRenderAt = 0;
+      const streamedPlan = await this.provider.generate(
+        planSystemPrompt,
+        userPayload,
+        (_chunk, full) => {
+          const split = splitReasoningContent(full);
+          planRecord.planText = (split.content || full || '').trim();
+          const now = Date.now();
+          if (now - lastRenderAt > 90) {
+            lastRenderAt = now;
+            this._renderPlanCard(bubbleEl, planRecord);
+          }
+        },
+        this.conversationHistory.slice(-6)
+      );
+
+      const finalSplit = splitReasoningContent(streamedPlan || '');
+      const cleanPlan = (finalSplit.content || streamedPlan || '').trim();
+      planRecord.planText = cleanPlan || buildOfflineDraftPlan(finalMsg, activeUiLib?.name || '');
+      planRecord.status = 'ready';
+      this._renderPlanCard(bubbleEl, planRecord);
+      this._saveChatHistory();
+    } catch (err) {
+      if (err?.name === 'AbortError' || this._userStoppedGeneration) {
+        if (!planRecord.planText) {
+          planRecord.planText = buildOfflineDraftPlan(finalMsg, activeUiLib?.name || '');
+        }
+        planRecord.status = 'ready';
+        planRecord.note = 'Plan generation stopped early — you can still edit this draft and click Approve & Build.';
+      } else {
+        planRecord.planText = buildOfflineDraftPlan(finalMsg, activeUiLib?.name || '');
+        planRecord.status = 'ready';
+        planRecord.note = `Draft plan generated locally (${err?.message?.slice(0, 72) || 'model unavailable'}). You can edit this plan below and click Approve & Build.`;
+      }
+      this._renderPlanCard(bubbleEl, planRecord);
+      this._saveChatHistory();
+    } finally {
+      this.isGenerating = false;
+      this._updateGeneratingUI(false);
+    }
+  }
+
+  _renderPlanCard(bubbleEl, planRecord) {
+    if (!bubbleEl || !planRecord) return;
+    const card = bubbleEl.querySelector('.plan-card') || bubbleEl.querySelector('.msg-body');
+    if (!card) return;
+
+    const statusLabel = {
+      streaming: 'Drafting plan…',
+      ready: 'Ready for review',
+      approved: 'Approved — Building',
+      discarded: 'Discarded',
+    }[planRecord.status] || 'Ready for review';
+
+    card.className = `plan-card${planRecord.status === 'approved' ? ' approved' : ''}${planRecord.status === 'discarded' ? ' discarded' : ''}`;
+    card.dataset.planId = planRecord.id;
+
+    const bodyHtml = planRecord.editing
+      ? `<textarea class="plan-editor-textarea" aria-label="Edit implementation plan">${escapeHtml(planRecord.planText)}</textarea>`
+      : `<div class="plan-card-body">${formatPlanMarkdownToHtml(planRecord.planText, escapeHtml)}</div>`;
+
+    const noteHtml = planRecord.note
+      ? `<div class="plan-card-note">${escapeHtml(planRecord.note)}</div>`
+      : '';
+
+    const showActions = planRecord.status === 'ready';
+    const actionsHtml = showActions
+      ? `
+        <div class="plan-card-actions">
+          <button type="button" class="btn-outline sm" data-plan-action="toggle-edit">
+            <i data-lucide="${planRecord.editing ? 'check' : 'pencil'}"></i>
+            <span>${planRecord.editing ? 'Save Edits' : 'Edit Plan'}</span>
+          </button>
+          <button type="button" class="btn-outline sm" data-plan-action="discard">
+            <i data-lucide="x"></i>
+            <span>Discard</span>
+          </button>
+          <button type="button" class="plan-btn-approve" data-plan-action="approve">
+            <i data-lucide="play"></i>
+            <span>Approve &amp; Build</span>
+          </button>
+        </div>`
+      : '';
+
+    card.innerHTML = `
+      <div class="plan-card-head">
+        <span class="plan-card-title-wrap">
+          <i data-lucide="clipboard-list"></i>
+          <span>Implementation Plan</span>
+        </span>
+        <span class="plan-card-status">${escapeHtml(statusLabel)}</span>
+      </div>
+      ${noteHtml}
+      ${bodyHtml}
+      ${actionsHtml}
+    `;
+
+    this._safeCreateIcons(card);
+
+    const textarea = card.querySelector('.plan-editor-textarea');
+    if (textarea) {
+      textarea.focus();
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    }
+
+    card.querySelector('[data-plan-action="toggle-edit"]')?.addEventListener('click', () => {
+      if (planRecord.editing) {
+        const ta = card.querySelector('.plan-editor-textarea');
+        if (ta) planRecord.planText = ta.value.trim() || planRecord.planText;
+        planRecord.editing = false;
+        this._renderPlanCard(bubbleEl, planRecord);
+        this._saveChatHistory();
+        this.showToast('Plan edits saved');
+      } else {
+        planRecord.editing = true;
+        this._renderPlanCard(bubbleEl, planRecord);
+      }
+    });
+
+    card.querySelector('[data-plan-action="discard"]')?.addEventListener('click', () => {
+      planRecord.editing = false;
+      planRecord.status = 'discarded';
+      this._renderPlanCard(bubbleEl, planRecord);
+      this._saveChatHistory();
+      this.showToast('Plan discarded');
+    });
+
+    card.querySelector('[data-plan-action="approve"]')?.addEventListener('click', () => {
+      if (planRecord.editing) {
+        const ta = card.querySelector('.plan-editor-textarea');
+        if (ta) planRecord.planText = ta.value.trim() || planRecord.planText;
+        planRecord.editing = false;
+      }
+      planRecord.status = 'approved';
+      this._renderPlanCard(bubbleEl, planRecord);
+      this._saveChatHistory();
+      const executionPrompt = buildApprovedPlanExecutionPrompt(planRecord.originalPrompt, planRecord.planText);
+      this.sendChatMessage({
+        approvedPlan: {
+          originalPrompt: planRecord.originalPrompt,
+          planText: planRecord.planText,
+          executionPrompt,
+          attachments: planRecord.attachments || [],
+        },
+      });
+    });
+
+    const msgContainer = document.getElementById('chatMessages');
+    if (msgContainer) msgContainer.scrollTop = msgContainer.scrollHeight;
+  }
+
   async sendChatMessage(options = {}) {
     const resumeJob = options.resumeJob || null;
+    const approvedPlan = options.approvedPlan || null;
     const input = document.getElementById('chatInput');
-    const msg = resumeJob ? String(resumeJob.userMessage || '').trim() : (input?.value || '').trim();
+    const msg = resumeJob
+      ? String(resumeJob.userMessage || '').trim()
+      : approvedPlan
+        ? String(approvedPlan.executionPrompt || '').trim()
+        : (input?.value || '').trim();
     if ((!msg && !this.wsAttachments.length) || this.isGenerating) return;
 
     const finalMsg = msg || 'Implement the design shown in the attached screenshot.';
@@ -2404,21 +2680,36 @@ export class WebForgeStudio {
       }
     }
 
+    // Intercept when Plan Mode is toggled ON (unless resuming or executing an already-approved plan)
+    if (this.agentPrefs.planMode && !resumeJob && !approvedPlan) {
+      await this._runPlanModeTurn(finalMsg);
+      return;
+    }
+
     const isResume = !!resumeJob;
-    const attachments = isResume ? [] : this.wsAttachments.slice();
+    const attachments = isResume
+      ? []
+      : approvedPlan
+        ? (approvedPlan.attachments || [])
+        : this.wsAttachments.slice();
     if (!isResume) {
       this.saveVFSHistory();
       const attHtml = attachments.length
         ? `<div class="msg-attachments">${attachments.map((a) => `<img src="${escapeHtml(a.dataUrl)}" alt="${escapeHtml(a.name)}">`).join('')}</div>`
         : '';
-      this._addMessageBubble('user', `${attHtml}<div>${escapeHtml(finalMsg)}</div>`, { rawText: finalMsg });
+      const displayBubbleText = approvedPlan
+        ? `Approved plan — building "${approvedPlan.originalPrompt.slice(0, 120)}"`
+        : finalMsg;
+      this._addMessageBubble('user', `${attHtml}<div>${escapeHtml(displayBubbleText)}</div>`, { rawText: displayBubbleText });
       this._saveChatHistory();
-      if (input) {
-        input.value = '';
-        input.style.height = 'auto';
+      if (!approvedPlan) {
+        if (input) {
+          input.value = '';
+          input.style.height = 'auto';
+        }
+        this.wsAttachments = [];
+        this._renderAttachments('ws');
       }
-      this.wsAttachments = [];
-      this._renderAttachments('ws');
       this._setRetryAvailable(false);
     } else if (resumeJob.historyBefore) {
       this.conversationHistory = Array.isArray(resumeJob.historyBefore) ? resumeJob.historyBefore.slice() : this.conversationHistory;
@@ -2441,7 +2732,11 @@ export class WebForgeStudio {
       if (!isResume) this.preview.clearSelectedElement();
 
       const activeUiLib = this.uiLibraryManager.getActiveLibrary();
-      const uiLibraryGuide = activeUiLib ? this.uiLibraryManager.buildPromptGuide(activeUiLib.id) : '';
+      let uiLibraryGuide = activeUiLib ? this.uiLibraryManager.buildPromptGuide(activeUiLib.id) : '';
+      if (!isResume && activeUiLib?.isRemoteCatalog && finalMsg) {
+        const matchedRef = await this.uiLibraryManager.fetchAwesomeAiMatches(finalMsg, 2);
+        if (matchedRef) uiLibraryGuide = `${uiLibraryGuide}\n\n${matchedRef}`;
+      }
       const baseSystemPrompt = this.skillManager.getSystemPrompt(activeProj?.customInstructions || '');
       const systemPrompt = uiLibraryGuide ? `${baseSystemPrompt}\n\n${uiLibraryGuide}` : baseSystemPrompt;
       const hasUserAskedBefore = this.conversationHistory.some((m) => m.role === 'user') || isResume;
@@ -4008,6 +4303,12 @@ export class WebForgeStudio {
       this._renderHomeProjects();
     });
     document.getElementById('homeModelBtn')?.addEventListener('click', () => document.getElementById('settingsModal')?.showModal());
+    document.getElementById('homeComposerModelBtn')?.addEventListener('click', () => document.getElementById('settingsModal')?.showModal());
+    document.getElementById('btnHeroUiCatalog')?.addEventListener('click', () => this.uiLibraryModal.open('awesome-components'));
+    document.getElementById('btnHomeQuickUiLib')?.addEventListener('click', () => this.uiLibraryModal.open());
+    document.getElementById('btnHomeQuickGithub')?.addEventListener('click', () => this.uiLibraryModal.open(null, 'github'));
+    document.getElementById('btnHomePlanToggle')?.addEventListener('click', () => this.togglePlanMode());
+    document.getElementById('btnWsPlanToggle')?.addEventListener('click', () => this.togglePlanMode());
     document.getElementById('btnNewProjectHome')?.addEventListener('click', () => this.createNewProject());
     document.getElementById('btnNewProjectHomeGrid')?.addEventListener('click', () => this.createNewProject());
     document.getElementById('btnOpenSettingsHome')?.addEventListener('click', () => document.getElementById('settingsModal')?.showModal());

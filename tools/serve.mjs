@@ -16,10 +16,19 @@ import {
   deleteAiTemplateItem,
   clearImportedAiTemplateItems,
 } from './ai-queue-store.mjs';
+import {
+  AWESOME_INDEX_REL_PATH,
+  AWESOME_CACHE_REL_DIR,
+  loadAwesomeCatalog,
+  searchAwesomeCatalog,
+  fetchAwesomeComponentDetail,
+} from './awesome-components.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
 const aiQueueFilePath = path.join(root, DEFAULT_AI_QUEUE_REL_PATH);
+const awesomeIndexPath = path.join(root, AWESOME_INDEX_REL_PATH);
+const awesomeCacheDir = path.join(root, AWESOME_CACHE_REL_DIR);
 const port = Number(process.argv[2] || process.env.PORT || 3000);
 
 const MIME = {
@@ -165,6 +174,77 @@ const server = http.createServer(async (req, res) => {
       } catch (err) {
         return sendJson(res, 400, { error: err?.message || 'AI template queue operation failed' });
       }
+    }
+
+    if (pathname === '/api/awesome-components') {
+      const q = (parsedUrl.searchParams.get('q') || '').trim();
+      const category = (parsedUrl.searchParams.get('category') || 'all').trim();
+      const page = Number(parsedUrl.searchParams.get('page') || 1);
+      const limit = Number(parsedUrl.searchParams.get('limit') || 24);
+      const catalog = loadAwesomeCatalog(awesomeIndexPath);
+      const result = searchAwesomeCatalog(catalog, { q, category, page, limit });
+      return sendJson(res, 200, result);
+    }
+
+    if (pathname === '/api/awesome-components/detail') {
+      const id = (parsedUrl.searchParams.get('id') || '').trim();
+      if (!id) return sendJson(res, 400, { error: 'Missing id query parameter' });
+      const catalog = loadAwesomeCatalog(awesomeIndexPath);
+      const item = catalog.find((c) => c.id === id);
+      if (!item) return sendJson(res, 404, { error: 'Awesome component not found' });
+      try {
+        const detail = await fetchAwesomeComponentDetail(item, awesomeCacheDir);
+        return sendJson(res, 200, detail);
+      } catch (err) {
+        return sendJson(res, 502, { error: err?.message || 'Failed to fetch component detail' });
+      }
+    }
+
+    if (pathname === '/api/awesome-components/ai-match') {
+      const q = (parsedUrl.searchParams.get('q') || '').trim();
+      const limit = Math.max(1, Math.min(4, Number(parsedUrl.searchParams.get('limit') || 2)));
+      const catalog = loadAwesomeCatalog(awesomeIndexPath);
+      if (!catalog.length) return sendJson(res, 200, { matches: [] });
+
+      // Extract high-signal UI keywords from natural language prompt
+      const stopWords = new Set(['build', 'create', 'make', 'website', 'webapp', 'page', 'with', 'that', 'this', 'from', 'using', 'modern', 'clean', 'nice', 'good', 'best', 'please', 'want', 'need', 'like', 'style', 'design', 'section', 'component', 'components', 'using', 'react', 'tailwind']);
+      const keywords = q
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, ' ')
+        .split(/\s+/)
+        .filter((w) => w.length >= 3 && !stopWords.has(w))
+        .slice(0, 5);
+
+      let picks = [];
+      for (const kw of keywords) {
+        const resSearch = searchAwesomeCatalog(catalog, { q: kw, limit: 2 });
+        for (const it of resSearch.items) {
+          if (!picks.some((p) => p.id === it.id)) picks.push(it);
+          if (picks.length >= limit) break;
+        }
+        if (picks.length >= limit) break;
+      }
+      if (!picks.length) {
+        picks = searchAwesomeCatalog(catalog, { q: 'hero', limit }).items;
+      }
+
+      const details = await Promise.all(
+        picks.slice(0, limit).map(async (it) => {
+          try {
+            const d = await fetchAwesomeComponentDetail(it, awesomeCacheDir);
+            return {
+              id: d.id,
+              name: d.name,
+              category: d.category,
+              authorName: d.authorName,
+              jsxSnippet: (d.jsxCode || '').slice(0, 2200),
+            };
+          } catch {
+            return { id: it.id, name: it.name, category: it.category, authorName: it.authorName, jsxSnippet: '' };
+          }
+        })
+      );
+      return sendJson(res, 200, { matches: details, catalogTotal: catalog.length });
     }
 
     // ── Static files ──

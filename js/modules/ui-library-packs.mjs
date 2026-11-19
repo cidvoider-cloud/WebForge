@@ -984,6 +984,67 @@ const RAW_PACKS = [
 `,
   },
   TWENTY_FIRST_DEV_RAW_PACK,
+  {
+    id: 'awesome-components',
+    name: 'Awesome Components',
+    tagline: '6,345 verified open-source React & Tailwind UI components from wundercorp/awesome-components — searchable by name, category & author.',
+    sampleBrand: 'Awesome UI',
+    sampleKicker: '6,345 Components',
+    sampleHeadline: 'Every UI pattern, ready to drop in.',
+    fontsLabel: 'Inter + JetBrains Mono (Tailwind / shadcn)',
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap',
+    swatches: ['#09090B', '#18181B', '#38BDF8', '#FAFAFA'],
+    isRemoteCatalog: true,
+    catalogCount: 6345,
+    source: 'github.com/wundercorp/awesome-components',
+    sourceUrl: 'https://github.com/wundercorp/awesome-components',
+    aiRules: [
+      'Compose sections using the Tailwind + shadcn semantic utility palette (bg-background, text-foreground, bg-card, bg-muted, text-muted-foreground, bg-primary, text-primary-foreground, border-border).',
+      'Preserve the refined spacing, crisp 1px borders, micro-interactions, and responsive structure of matched Awesome Components.',
+      'Keep every inserted Awesome Component cleanly modular inside src/components/ and compose them cohesively in src/App.jsx.',
+    ],
+    tokensCss: `
+:root, .wf-ui-scope {
+  --wf-bg: #09090B;
+  --wf-surface: #111114;
+  --wf-hero-bg: linear-gradient(180deg, #111114 0%, #09090B 100%);
+  --wf-input-bg: #111114;
+  --wf-fg: #FAFAFA;
+  --wf-muted: #A1A1AA;
+  --wf-border: rgba(255,255,255,0.12);
+  --wf-border-width: 1px;
+  --wf-accent: #FAFAFA;
+  --wf-accent-fg: #09090B;
+  --wf-accent-text: #38BDF8;
+  --wf-alert-bg: rgba(56,189,248,0.10);
+  --wf-alert-border: rgba(56,189,248,0.32);
+  --wf-radius: 10px;
+  --wf-font-display: 'Inter', system-ui, sans-serif;
+  --wf-font-body: 'Inter', system-ui, sans-serif;
+  --wf-font-mono: 'JetBrains Mono', monospace;
+  --wf-shadow-card: 0 12px 30px -12px rgba(0,0,0,0.45);
+  --background: 240 10% 3.9%;
+  --foreground: 0 0% 98%;
+  --card: 240 10% 5.5%;
+  --card-foreground: 0 0% 98%;
+  --muted: 240 3.7% 15.9%;
+  --muted-foreground: 240 5% 64.9%;
+  --primary: 0 0% 98%;
+  --primary-foreground: 240 5.9% 10%;
+  --border: 240 3.7% 18%;
+}
+.bg-background { background-color: var(--wf-bg, #09090B); }
+.text-foreground { color: var(--wf-fg, #FAFAFA); }
+.bg-card { background-color: var(--wf-surface, #111114); }
+.text-card-foreground { color: var(--wf-fg, #FAFAFA); }
+.bg-muted { background-color: rgba(255,255,255,0.06); }
+.text-muted-foreground { color: var(--wf-muted, #A1A1AA); }
+.bg-primary { background-color: var(--wf-accent, #FAFAFA); }
+.text-primary-foreground { color: var(--wf-accent-fg, #09090B); }
+.border-border { border-color: var(--wf-border, rgba(255,255,255,0.12)); }
+`,
+    customElements: [],
+  },
 ];
 
 export const BUILT_IN_UI_LIBRARIES = RAW_PACKS.map((pack) => {
