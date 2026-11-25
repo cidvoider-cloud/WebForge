@@ -101,3 +101,46 @@ export function clearImportedAiTemplateItems(filePath) {
   writeAiQueueFile(filePath, next);
   return { removedCount: current.length - next.length, templates: next };
 }
+
+/**
+ * Non-destructive merge of browser-cached and disk-persisted AI queue items.
+ * Never deletes local items when the server file is empty; resolves conflicts by latest updatedAt.
+ */
+export function mergeAiTemplateLists(localList = [], serverList = []) {
+  const byId = new Map();
+  const safeLocal = Array.isArray(localList) ? localList : [];
+  const safeServer = Array.isArray(serverList) ? serverList : [];
+
+  for (const raw of safeServer) {
+    if (!raw || !raw.id || !raw.name || !raw.prompt) continue;
+    byId.set(String(raw.id), { ...raw });
+  }
+
+  let recoveredCount = 0;
+  for (const raw of safeLocal) {
+    if (!raw || !raw.id || !raw.name || !raw.prompt) continue;
+    const id = String(raw.id);
+    const existing = byId.get(id);
+    if (!existing) {
+      byId.set(id, { ...raw });
+      recoveredCount += 1;
+    } else if (Number(raw.updatedAt || 0) > Number(existing.updatedAt || 0)) {
+      byId.set(id, { ...existing, ...raw });
+    }
+  }
+
+  const merged = Array.from(byId.values()).sort(
+    (a, b) => Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0)
+  );
+  return { templates: merged, recoveredCount };
+}
+
+export function syncAiTemplateItems(filePath, incomingTemplates = []) {
+  const diskTemplates = readAiQueueFile(filePath);
+  const { templates, recoveredCount } = mergeAiTemplateLists(incomingTemplates, diskTemplates);
+  if (recoveredCount > 0 || templates.length !== diskTemplates.length) {
+    writeAiQueueFile(filePath, templates);
+  }
+  return { templates, recoveredCount };
+}
+

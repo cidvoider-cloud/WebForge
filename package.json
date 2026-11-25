@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "node tools/serve.mjs 3000",
     "start": "node tools/serve.mjs 3000",
-    "build": "node --check tools/serve.mjs && node --check tools/search-engine.mjs && node --check js/main.mjs && for f in js/modules/*.mjs; do node --check \"$f\" || exit 1; done && node --check js/check-wizard-footer.js",
+    "check": "node tools/preflight-check.mjs --repair",
+    "build": "node --check tools/serve.mjs && node --check tools/search-engine.mjs && node --check tools/preflight-check.mjs && node --check js/main.mjs && for f in js/modules/*.mjs src/components/settings/*.mjs; do node --check \"$f\" || exit 1; done && node --check js/check-wizard-footer.js",
     "lint": "node js/check-wizard-footer.js"
   }
 }

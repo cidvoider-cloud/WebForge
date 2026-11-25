@@ -4,6 +4,50 @@
 
 import { isHtmlVfs } from './context-budget.mjs';
 import { escapeHtml } from './storage.mjs';
+import { PREVIEW_KIT_MANIFEST, resolveLockedPackageVersion } from './ui-library-schema.mjs';
+import { extractImportSpecifiers } from './ui-normalizer.mjs';
+
+function collectExportDependencies(vfs = {}, attachedManifests = []) {
+  const lockPkgs = PREVIEW_KIT_MANIFEST.packages;
+  const deps = {
+    react: lockPkgs.react,
+    'react-dom': lockPkgs['react-dom'],
+    'lucide-react': lockPkgs['lucide-react'],
+  };
+  const extraCssBlocks = [];
+
+  // 1. Merge explicit dependency manifests from attached components
+  for (const manifest of Array.isArray(attachedManifests) ? attachedManifests : []) {
+    if (!manifest || typeof manifest !== 'object') continue;
+    const depMap = manifest.dependencies && typeof manifest.dependencies === 'object'
+      ? manifest.dependencies
+      : {};
+    for (const [pkg, ver] of Object.entries(depMap)) {
+      const locked = resolveLockedPackageVersion(pkg, lockPkgs);
+      if (locked) deps[pkg] = locked;
+      else if (ver && ver !== 'latest') deps[pkg] = String(ver);
+    }
+    if (manifest.css && String(manifest.css).trim()) {
+      extraCssBlocks.push(String(manifest.css).trim());
+    }
+  }
+
+  // 2. Scan VFS source files for imported npm packages and pin them from lockfile
+  for (const [filePath, content] of Object.entries(vfs || {})) {
+    if (!/\.(jsx|tsx|js|ts|mjs)$/i.test(filePath) || typeof content !== 'string') continue;
+    for (const spec of extractImportSpecifiers(content)) {
+      if (spec.startsWith('.') || spec.startsWith('/') || spec.startsWith('@/')) continue;
+      const basePkg = spec.startsWith('@') ? spec.split('/').slice(0, 2).join('/') : spec.split('/')[0];
+      const locked = resolveLockedPackageVersion(basePkg, lockPkgs);
+      if (locked) deps[basePkg] = locked;
+    }
+  }
+
+  return {
+    dependencies: Object.fromEntries(Object.entries(deps).sort(([a], [b]) => a.localeCompare(b))),
+    extraCss: Array.from(new Set(extraCssBlocks)).join('\n\n'),
+  };
+}
 
 function crc32(data) {
   let crc = 0xFFFFFFFF;
@@ -101,7 +145,7 @@ export function createZipBlob(files) {
   return new Blob([result], { type: 'application/zip' });
 }
 
-export function buildProjectExportFiles(projectName, vfs, standaloneHtml) {
+export function buildProjectExportFiles(projectName, vfs, standaloneHtml, { attachedManifests = [] } = {}) {
   const isHtmlOnly = isHtmlVfs(vfs);
   const safeSlug = String(projectName || 'webforge-project')
     .toLowerCase()
@@ -110,7 +154,17 @@ export function buildProjectExportFiles(projectName, vfs, standaloneHtml) {
   const files = Object.entries(vfs || {}).map(([name, content]) => ({ name, content }));
 
   if (!isHtmlOnly) {
-    if (!vfs['package.json']) {
+    const lockPkgs = PREVIEW_KIT_MANIFEST.packages;
+    const { dependencies, extraCss } = collectExportDependencies(vfs, attachedManifests);
+    const devDependencies = {
+      '@tailwindcss/vite': lockPkgs['@tailwindcss/vite'],
+      '@vitejs/plugin-react': lockPkgs['@vitejs/plugin-react'],
+      tailwindcss: lockPkgs.tailwindcss,
+      vite: lockPkgs.vite,
+    };
+
+    const existingPkgIdx = files.findIndex((f) => f.name === 'package.json');
+    if (existingPkgIdx === -1) {
       files.push({
         name: 'package.json',
         content: JSON.stringify({
@@ -119,23 +173,52 @@ export function buildProjectExportFiles(projectName, vfs, standaloneHtml) {
           version: '0.0.0',
           type: 'module',
           scripts: { dev: 'vite', build: 'vite build', preview: 'vite preview' },
-          dependencies: { react: '^18.2.0', 'react-dom': '^18.2.0', 'lucide-react': '^0.460.0' },
-          devDependencies: { '@vitejs/plugin-react': '^4.2.1', vite: '^5.1.0', tailwindcss: '^3.4.1' },
+          dependencies,
+          devDependencies,
         }, null, 2),
       });
+    } else {
+      try {
+        const parsed = JSON.parse(files[existingPkgIdx].content || '{}');
+        parsed.dependencies = { ...(parsed.dependencies || {}), ...dependencies };
+        parsed.devDependencies = { ...devDependencies, ...(parsed.devDependencies || {}) };
+        files[existingPkgIdx] = { name: 'package.json', content: JSON.stringify(parsed, null, 2) };
+      } catch {
+        // Preserve user package.json if unparseable
+      }
     }
+
     if (!vfs['index.html']) {
       const entry = vfs['src/main.tsx'] ? '/src/main.tsx' : '/src/main.jsx';
       files.push({
         name: 'index.html',
-        content: `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>${escapeHtml(projectName || 'WebForge App')}</title>\n  <script src="https://cdn.tailwindcss.com"></script>\n</head>\n<body>\n  <div id="root"></div>\n  <script type="module" src="${entry}"></script>\n</body>\n</html>\n`,
+        content: `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>${escapeHtml(projectName || 'WebForge App')}</title>\n</head>\n<body>\n  <div id="root"></div>\n  <script type="module" src="${entry}"></script>\n</body>\n</html>\n`,
       });
     }
+
     if (!vfs['vite.config.js'] && !vfs['vite.config.ts']) {
       files.push({
         name: 'vite.config.js',
-        content: `import { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\n\nexport default defineConfig({\n  plugins: [react()],\n  resolve: { alias: { '@': '/src' } },\n});\n`,
+        content: `import { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\nimport tailwindcss from '@tailwindcss/vite';\n\nexport default defineConfig({\n  plugins: [react(), tailwindcss()],\n  resolve: { alias: { '@': '/src' } },\n});\n`,
       });
+    }
+
+    // Ensure src/index.css includes Tailwind v4 import and any attached component CSS
+    const cssIdx = files.findIndex((f) => f.name === 'src/index.css');
+    if (cssIdx === -1) {
+      files.push({
+        name: 'src/index.css',
+        content: `@import "tailwindcss";\n${extraCss ? `\n${extraCss}\n` : ''}`,
+      });
+    } else {
+      let cssBody = String(files[cssIdx].content || '');
+      if (!/@import\s+["']tailwindcss["']/.test(cssBody)) {
+        cssBody = `@import "tailwindcss";\n${cssBody}`;
+      }
+      if (extraCss && !cssBody.includes(extraCss.slice(0, 40))) {
+        cssBody = `${cssBody.trimEnd()}\n\n${extraCss}\n`;
+      }
+      files[cssIdx] = { name: 'src/index.css', content: cssBody };
     }
   }
 

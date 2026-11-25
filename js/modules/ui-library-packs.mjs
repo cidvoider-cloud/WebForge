@@ -7,6 +7,20 @@
  */
 
 import { TWENTY_FIRST_DEV_RAW_PACK } from './ui-library-21st.mjs';
+import {
+  HIDE_OTHER_SOURCES,
+  HARD_DELETE,
+  KEEP_INDEXED_LIBRARY_IDS,
+  PREVIEW_KIT_MANIFEST,
+} from './ui-library-schema.mjs';
+
+const PINNED_INDEXED_COMMITS = {
+  'awesome-components': '87e9f787c81c',
+  'kokonut-ui': '7e4bd770ca3f',
+  hyperui: '0be87b52222f',
+  'watermelon-ui': 'registry-v4-2026-11-21',
+  'shadcn-ui': '055aa6b7837b',
+};
 
 export const UI_ELEMENT_CATEGORIES = [
   { id: 'buttons', label: 'Buttons' },
@@ -987,12 +1001,12 @@ const RAW_PACKS = [
   {
     id: 'awesome-components',
     name: 'Awesome Components',
-    tagline: '6,345 verified open-source React & Tailwind UI components from wundercorp/awesome-components — searchable by name, category & author.',
+    tagline: 'Open-source React & Tailwind UI components from wundercorp/awesome-components — searchable by name, category & author.',
     sampleBrand: 'Awesome UI',
-    sampleKicker: '6,345 Components',
+    sampleKicker: 'Verified Components',
     sampleHeadline: 'Every UI pattern, ready to drop in.',
     fontsLabel: 'Inter + JetBrains Mono (Tailwind / shadcn)',
-    fontsUrl: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap',
+    fontsUrl: '',
     swatches: ['#09090B', '#18181B', '#38BDF8', '#FAFAFA'],
     isRemoteCatalog: true,
     catalogCount: 6345,
@@ -1045,16 +1059,411 @@ const RAW_PACKS = [
 `,
     customElements: [],
   },
+  {
+    id: 'kokonut-ui',
+    name: 'Kokonut UI',
+    tagline: 'Motion-first React & Tailwind components from kokonut-labs/kokonutui — AI interfaces, animated cards, drawers & shaders.',
+    sampleBrand: 'Kokonut UI',
+    sampleKicker: 'Verified Components',
+    sampleHeadline: 'Fluid motion & AI-native UI blocks.',
+    fontsLabel: 'Inter + JetBrains Mono (Tailwind / Motion)',
+    fontsUrl: '',
+    swatches: ['#09090B', '#18181B', '#FB7185', '#FAFAFA'],
+    isRemoteCatalog: true,
+    catalogType: 'tsx',
+    catalogCount: 121,
+    source: 'github.com/kokonut-labs/kokonutui',
+    sourceUrl: 'https://github.com/kokonut-labs/kokonutui',
+    aiRules: [
+      'Use Kokonut UI motion-first Tailwind & shadcn conventions with refined micro-interactions, crisp hairline borders, and balanced dark/light contrast.',
+      'Compose AI interfaces (prompt inputs, agent lanes, diff views, context meters) and animated surface cards cleanly in modular components.',
+      'Use Lucide icons and smooth spring-like transitions without cluttered glow overload.',
+    ],
+    tokensCss: `
+:root, .wf-ui-scope {
+  --wf-bg: #09090B;
+  --wf-surface: #121216;
+  --wf-hero-bg: linear-gradient(180deg, #16141A 0%, #09090B 100%);
+  --wf-input-bg: #121216;
+  --wf-fg: #FAFAFA;
+  --wf-muted: #A1A1AA;
+  --wf-border: rgba(255,255,255,0.11);
+  --wf-border-width: 1px;
+  --wf-accent: #FB7185;
+  --wf-accent-fg: #09090B;
+  --wf-accent-text: #FDA4AF;
+  --wf-alert-bg: rgba(251,113,133,0.12);
+  --wf-alert-border: rgba(251,113,133,0.34);
+  --wf-radius: 12px;
+  --wf-font-display: 'Inter', system-ui, sans-serif;
+  --wf-font-body: 'Inter', system-ui, sans-serif;
+  --wf-font-mono: 'JetBrains Mono', monospace;
+  --wf-shadow-card: 0 12px 30px -12px rgba(0,0,0,0.45);
+}
+`,
+    customElements: [],
+  },
+  {
+    id: 'hyperui',
+    name: 'HyperUI',
+    tagline: 'Paired Light & Dark pure Tailwind CSS HTML blocks from markmead/hyperui — Application UI, Marketing & Neobrutalism.',
+    sampleBrand: 'HyperUI',
+    sampleKicker: 'Verified Components',
+    sampleHeadline: 'Zero-dependency Tailwind CSS blocks.',
+    fontsLabel: 'Inter + System Sans (Pure Tailwind CSS)',
+    fontsUrl: '',
+    swatches: ['#0F172A', '#1E293B', '#6366F1', '#F8FAFC'],
+    isRemoteCatalog: true,
+    catalogType: 'html',
+    catalogCount: 326,
+    source: 'github.com/markmead/hyperui',
+    sourceUrl: 'https://github.com/markmead/hyperui',
+    aiRules: [
+      'Write semantic, accessible HTML & Tailwind CSS markup matching HyperUI conventions with native dark: utility variants.',
+      'Keep layouts clean, responsive, and dependency-free using pure Tailwind utility classes across Application UI, Marketing, and Neobrutalism sections.',
+      'Ensure keyboard focus rings, clear contrast ratios, and structured visual hierarchy on every section.',
+    ],
+    tokensCss: `
+:root, .wf-ui-scope {
+  --wf-bg: #0F172A;
+  --wf-surface: #1E293B;
+  --wf-hero-bg: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
+  --wf-input-bg: #1E293B;
+  --wf-fg: #F8FAFC;
+  --wf-muted: #94A3B8;
+  --wf-border: rgba(148,163,184,0.2);
+  --wf-border-width: 1px;
+  --wf-accent: #6366F1;
+  --wf-accent-fg: #FFFFFF;
+  --wf-accent-text: #818CF8;
+  --wf-alert-bg: rgba(99,102,241,0.12);
+  --wf-alert-border: rgba(99,102,241,0.34);
+  --wf-radius: 8px;
+  --wf-font-display: 'Inter', system-ui, sans-serif;
+  --wf-font-body: 'Inter', system-ui, sans-serif;
+  --wf-font-mono: 'JetBrains Mono', monospace;
+  --wf-shadow-card: 0 10px 24px -10px rgba(15,23,42,0.45);
+}
+`,
+    customElements: [],
+  },
+  {
+    id: 'watermelon-ui',
+    name: 'Watermelon UI',
+    tagline: 'Official ui.watermelon.sh library: Animated UI, Components, Blocks, Dashboards, and Templates.',
+    sampleBrand: 'Watermelon UI',
+    sampleKicker: 'Verified Components',
+    sampleHeadline: 'Animated UI, Components, Blocks, Dashboards, and Templates.',
+    fontsLabel: 'Inter + JetBrains Mono (React 19 · Motion · Tailwind v4)',
+    fontsUrl: '',
+    swatches: ['#0A0B0D', '#14161A', '#10B981', '#F43F5E'],
+    isRemoteCatalog: true,
+    catalogType: 'tsx',
+    catalogCount: 849,
+    source: 'ui.watermelon.sh',
+    sourceUrl: 'https://ui.watermelon.sh',
+    aiRules: [
+      'Follow Watermelon UI tactile craft: crisp 1px hairlines, subtle top-edge sheen, spring-physics disclosure transitions, and generous breathing room.',
+      'Compose interactive widgets (inline disclosures, activity cards, adaptive controls, command bars, stacked menus) with clean state transitions and tabular-nums.',
+      'Keep metadata quiet and unboxed; reserve accent color strictly for focal triggers and active states.',
+    ],
+    tokensCss: `
+:root, .wf-ui-scope {
+  --wf-bg: #0A0B0D;
+  --wf-surface: #131519;
+  --wf-hero-bg: linear-gradient(180deg, #16191F 0%, #0A0B0D 100%);
+  --wf-input-bg: #131519;
+  --wf-fg: #F5F6F8;
+  --wf-muted: #98A0AD;
+  --wf-border: rgba(255,255,255,0.10);
+  --wf-border-width: 1px;
+  --wf-accent: #10B981;
+  --wf-accent-fg: #041A12;
+  --wf-accent-text: #34D399;
+  --wf-alert-bg: rgba(16,185,129,0.12);
+  --wf-alert-border: rgba(16,185,129,0.34);
+  --wf-radius: 12px;
+  --wf-font-display: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --wf-font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --wf-font-mono: 'JetBrains Mono', monospace;
+  --wf-shadow-card: 0 14px 32px -14px rgba(0,0,0,0.55);
+}
+`,
+    customElements: [],
+  },
+  {
+    id: 'shadcn-ui',
+    name: 'shadcn/ui',
+    tagline: 'Official shadcn/ui v4 primitives, interactive examples & multi-file layout blocks from shadcn-ui/ui.',
+    sampleBrand: 'shadcn/ui',
+    sampleKicker: 'Verified Components',
+    sampleHeadline: 'Accessible, composable React primitives.',
+    fontsLabel: 'Inter + JetBrains Mono (Radix / Tailwind v4)',
+    fontsUrl: '',
+    swatches: ['#09090B', '#18181B', '#E4E4E7', '#FAFAFA'],
+    isRemoteCatalog: true,
+    catalogType: 'tsx',
+    catalogCount: 275,
+    source: 'github.com/shadcn-ui/ui',
+    sourceUrl: 'https://github.com/shadcn-ui/ui',
+    aiRules: [
+      'Follow official shadcn/ui v4 semantic CSS variable tokens (--background, --foreground, --card, --primary, --secondary, --muted, --accent, --destructive, --border, --ring).',
+      'Build accessible, keyboard-navigable Radix-style primitives composed with cn() and class-variance-authority variants.',
+      'Prefer restrained monochrome zinc palettes, crisp 1px borders, subtle ring focus states, and clean typographic hierarchy.',
+    ],
+    tokensCss: `
+:root, .wf-ui-scope {
+  --wf-bg: #09090B;
+  --wf-surface: #111114;
+  --wf-hero-bg: linear-gradient(180deg, #141418 0%, #09090B 100%);
+  --wf-input-bg: #111114;
+  --wf-fg: #FAFAFA;
+  --wf-muted: #A1A1AA;
+  --wf-border: rgba(255,255,255,0.12);
+  --wf-border-width: 1px;
+  --wf-accent: #FAFAFA;
+  --wf-accent-fg: #09090B;
+  --wf-accent-text: #E4E4E7;
+  --wf-alert-bg: rgba(255,255,255,0.06);
+  --wf-alert-border: rgba(255,255,255,0.18);
+  --wf-radius: 10px;
+  --wf-font-display: 'Inter', system-ui, sans-serif;
+  --wf-font-body: 'Inter', system-ui, sans-serif;
+  --wf-font-mono: 'JetBrains Mono', monospace;
+  --wf-shadow-card: 0 12px 28px -12px rgba(0,0,0,0.45);
+}
+`,
+    customElements: [],
+  },
+  {
+    id: 'designmd-linear',
+    name: 'Linear (DESIGN.md)',
+    tagline: 'Ultra-minimal dark obsidian precision from VoltAgent/awesome-design-md — crisp 1px hairlines, tight tracking, and electric indigo focus.',
+    sampleBrand: 'Linear',
+    sampleKicker: 'DESIGN.md · Issue Tracking',
+    sampleHeadline: 'Purpose-built for modern product teams.',
+    fontsLabel: 'Plus Jakarta Sans + JetBrains Mono (DESIGN.md)',
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap',
+    swatches: ['#08090A', '#111214', '#5E6AD2', '#F7F8F8'],
+    isDesignMdPreset: true,
+    source: 'github.com/VoltAgent/awesome-design-md',
+    sourceUrl: 'https://github.com/VoltAgent/awesome-design-md',
+    aiRules: [
+      'DESIGN.md (Linear): Canvas #08090A, elevated cards #111214, hairline borders rgba(255,255,255,0.08), primary text #F7F8F8, muted #8A8F98, single focal accent #5E6AD2.',
+      'Typography: Tight display tracking (-0.03em), restrained weights (500/600), monospace tabular-nums for issue IDs, shortcuts, and timestamps.',
+      'Layout & Motion: Dense keyboard-first hierarchy, single elevation depth, crisp 1px separators, snappy <200ms hover/focus transitions, zero decorative glow bloat.',
+    ],
+    tokensCss: `
+:root, .wf-ui-scope {
+  --wf-bg: #08090A;
+  --wf-surface: #111214;
+  --wf-hero-bg: linear-gradient(180deg, #141519 0%, #08090A 100%);
+  --wf-input-bg: #111214;
+  --wf-fg: #F7F8F8;
+  --wf-muted: #8A8F98;
+  --wf-border: rgba(255,255,255,0.09);
+  --wf-border-width: 1px;
+  --wf-accent: #5E6AD2;
+  --wf-accent-fg: #FFFFFF;
+  --wf-accent-text: #828FFF;
+  --wf-alert-bg: rgba(94,106,210,0.14);
+  --wf-alert-border: rgba(94,106,210,0.34);
+  --wf-radius: 8px;
+  --wf-font-display: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --wf-font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --wf-font-mono: 'JetBrains Mono', monospace;
+  --wf-shadow-card: 0 12px 32px -12px rgba(0,0,0,0.65);
+}
+`,
+  },
+  {
+    id: 'designmd-stripe',
+    name: 'Stripe (DESIGN.md)',
+    tagline: 'Editorial fintech clarity from VoltAgent/awesome-design-md — crisp white canvas, deep slate ink (#0A2540), and vibrant blurple (#635BFF) CTAs.',
+    sampleBrand: 'Stripe',
+    sampleKicker: 'DESIGN.md · Financial Infrastructure',
+    sampleHeadline: 'Financial infrastructure to grow revenue.',
+    fontsLabel: 'Plus Jakarta Sans + JetBrains Mono (DESIGN.md)',
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap',
+    swatches: ['#FFFFFF', '#F6F9FC', '#635BFF', '#0A2540'],
+    isDesignMdPreset: true,
+    source: 'github.com/VoltAgent/awesome-design-md',
+    sourceUrl: 'https://github.com/VoltAgent/awesome-design-md',
+    aiRules: [
+      'DESIGN.md (Stripe): Crisp white #FFFFFF canvas alternating with cool surface #F6F9FC, deep navy ink #0A2540, slate body #425466, and electric blurple #635BFF primary actions.',
+      'Typography & Rhythm: Confident architectural display type (-0.03em), generous vertical whitespace, structured editorial columns, and tabular numerals on every currency or KPI value.',
+      'Elevation: Soft multi-layered ambient card shadows (0 12px 28px rgba(10,37,64,0.08)) paired with crisp 1px borders—never heavy dark drop shadows on light surfaces.',
+    ],
+    tokensCss: `
+:root, .wf-ui-scope {
+  --wf-bg: #F6F9FC;
+  --wf-surface: #FFFFFF;
+  --wf-hero-bg: linear-gradient(180deg, #FFFFFF 0%, #F6F9FC 100%);
+  --wf-input-bg: #FFFFFF;
+  --wf-fg: #0A2540;
+  --wf-muted: #425466;
+  --wf-border: rgba(10,37,64,0.11);
+  --wf-border-width: 1px;
+  --wf-accent: #635BFF;
+  --wf-accent-fg: #FFFFFF;
+  --wf-accent-text: #635BFF;
+  --wf-alert-bg: rgba(99,91,255,0.09);
+  --wf-alert-border: rgba(99,91,255,0.28);
+  --wf-radius: 10px;
+  --wf-font-display: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --wf-font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --wf-font-mono: 'JetBrains Mono', monospace;
+  --wf-shadow-card: 0 12px 28px -10px rgba(10,37,64,0.12);
+}
+`,
+  },
+  {
+    id: 'designmd-vercel',
+    name: 'Vercel (DESIGN.md)',
+    tagline: 'Stark monochrome developer precision from VoltAgent/awesome-design-md — pure black canvas, crisp hairline grids, and zero-fluff contrast.',
+    sampleBrand: 'Vercel',
+    sampleKicker: 'DESIGN.md · Cloud Platform',
+    sampleHeadline: 'Develop. Preview. Ship.',
+    fontsLabel: 'DM Sans + JetBrains Mono (DESIGN.md)',
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap',
+    swatches: ['#000000', '#0A0A0A', '#FAFAFA', '#888888'],
+    isDesignMdPreset: true,
+    source: 'github.com/VoltAgent/awesome-design-md',
+    sourceUrl: 'https://github.com/VoltAgent/awesome-design-md',
+    aiRules: [
+      'DESIGN.md (Vercel): Stark #000000 canvas, #0A0A0A panels, crisp 1px #262626 grid hairlines, high-contrast #FAFAFA primary buttons with #000000 ink, muted text #888888.',
+      'Geometry: Tight 6px–8px border radii, architectural grid alignment with exposed hairline dividers, zero ornamental gradients or heavy box shadows.',
+      'Typography: Crisp geometric sans (-0.035em hero headlines) paired with JetBrains Mono for CLI commands, deployment URLs, and build timings.',
+    ],
+    tokensCss: `
+:root, .wf-ui-scope {
+  --wf-bg: #000000;
+  --wf-surface: #0A0A0A;
+  --wf-hero-bg: linear-gradient(180deg, #0D0D0D 0%, #000000 100%);
+  --wf-input-bg: #0A0A0A;
+  --wf-fg: #FAFAFA;
+  --wf-muted: #888888;
+  --wf-border: rgba(255,255,255,0.14);
+  --wf-border-width: 1px;
+  --wf-accent: #FAFAFA;
+  --wf-accent-fg: #000000;
+  --wf-accent-text: #FAFAFA;
+  --wf-alert-bg: rgba(255,255,255,0.06);
+  --wf-alert-border: rgba(255,255,255,0.22);
+  --wf-radius: 6px;
+  --wf-font-display: 'DM Sans', system-ui, sans-serif;
+  --wf-font-body: 'DM Sans', system-ui, sans-serif;
+  --wf-font-mono: 'JetBrains Mono', monospace;
+  --wf-shadow-card: none;
+}
+`,
+  },
+  {
+    id: 'designmd-raycast',
+    name: 'Raycast (DESIGN.md)',
+    tagline: 'Command-first macOS launcher aesthetic from VoltAgent/awesome-design-md — carbon glass ladder, tight radii, and vibrant crimson-coral focus.',
+    sampleBrand: 'Raycast',
+    sampleKicker: 'DESIGN.md · Productivity Launcher',
+    sampleHeadline: 'Your shortcut to everything.',
+    fontsLabel: 'Manrope + JetBrains Mono (DESIGN.md)',
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap',
+    swatches: ['#0C0D10', '#16181D', '#FF6363', '#F5F6FA'],
+    isDesignMdPreset: true,
+    source: 'github.com/VoltAgent/awesome-design-md',
+    sourceUrl: 'https://github.com/VoltAgent/awesome-design-md',
+    aiRules: [
+      'DESIGN.md (Raycast): Deep carbon canvas #0C0D10, subtle glass surface ladder (#16181D -> #1F2229), razor 1px top highlights, primary text #F5F6FA, crimson-coral focal accent #FF6363.',
+      'Interaction Craft: Keyboard-shortcut hints (kbd badges in monospace), snappy instant command search lists, subtle inner-top highlights, compact 10px–12px corners.',
+      'Restraint: Reserve crimson-coral strictly for the single primary action and active highlights; keep 90% of chrome in calm charcoal neutrals.',
+    ],
+    tokensCss: `
+:root, .wf-ui-scope {
+  --wf-bg: #0C0D10;
+  --wf-surface: #16181D;
+  --wf-hero-bg: linear-gradient(180deg, #1A1C24 0%, #0C0D10 100%);
+  --wf-input-bg: #16181D;
+  --wf-fg: #F5F6FA;
+  --wf-muted: #98A0B3;
+  --wf-border: rgba(255,255,255,0.1);
+  --wf-border-width: 1px;
+  --wf-accent: #FF6363;
+  --wf-accent-fg: #0C0D10;
+  --wf-accent-text: #FF8282;
+  --wf-alert-bg: rgba(255,99,99,0.12);
+  --wf-alert-border: rgba(255,99,99,0.34);
+  --wf-radius: 10px;
+  --wf-font-display: 'Manrope', system-ui, sans-serif;
+  --wf-font-body: 'Manrope', system-ui, sans-serif;
+  --wf-font-mono: 'JetBrains Mono', monospace;
+  --wf-shadow-card: 0 16px 36px -14px rgba(0,0,0,0.65);
+}
+`,
+  },
+  {
+    id: 'designmd-supabase',
+    name: 'Supabase (DESIGN.md)',
+    tagline: 'Developer database studio system from VoltAgent/awesome-design-md — deep graphite surfaces, emerald (#3ECF8E) triggers, and tabular clarity.',
+    sampleBrand: 'Supabase',
+    sampleKicker: 'DESIGN.md · Postgres Platform',
+    sampleHeadline: 'Build in a weekend. Scale to millions.',
+    fontsLabel: 'Outfit + JetBrains Mono (DESIGN.md)',
+    fontsUrl: 'https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap',
+    swatches: ['#121212', '#1C1C1C', '#3ECF8E', '#EDEDED'],
+    isDesignMdPreset: true,
+    source: 'github.com/VoltAgent/awesome-design-md',
+    sourceUrl: 'https://github.com/VoltAgent/awesome-design-md',
+    aiRules: [
+      'DESIGN.md (Supabase): Deep graphite background #121212, elevated panels #1C1C1C, crisp borders #2E2E2E, foreground #EDEDED, muted #8E8E8E, signature emerald #3ECF8E primary actions.',
+      'Developer Ergonomics: Clean code blocks, schema/table grids with tabular-nums, sharp 8px radius, high-contrast emerald active states paired with dark #0A1410 button text.',
+      'Layout Discipline: Single-elevation panels separated by 1px borders and breathing whitespace; no distracting neon blurs.',
+    ],
+    tokensCss: `
+:root, .wf-ui-scope {
+  --wf-bg: #121212;
+  --wf-surface: #1C1C1C;
+  --wf-hero-bg: linear-gradient(180deg, #19211D 0%, #121212 100%);
+  --wf-input-bg: #1C1C1C;
+  --wf-fg: #EDEDED;
+  --wf-muted: #9A9A9A;
+  --wf-border: rgba(255,255,255,0.11);
+  --wf-border-width: 1px;
+  --wf-accent: #3ECF8E;
+  --wf-accent-fg: #09130E;
+  --wf-accent-text: #3ECF8E;
+  --wf-alert-bg: rgba(62,207,142,0.12);
+  --wf-alert-border: rgba(62,207,142,0.34);
+  --wf-radius: 8px;
+  --wf-font-display: 'Outfit', system-ui, sans-serif;
+  --wf-font-body: 'Outfit', system-ui, sans-serif;
+  --wf-font-mono: 'JetBrains Mono', monospace;
+  --wf-shadow-card: 0 12px 28px -12px rgba(0,0,0,0.55);
+}
+`,
+  },
 ];
 
-export const BUILT_IN_UI_LIBRARIES = RAW_PACKS.map((pack) => {
-  const fullTokensCss = `${pack.fontsUrl ? `@import url('${pack.fontsUrl}');\n` : ''}${SHARED_UI_BASE_CSS}\n${pack.tokensCss}`;
-  return {
-    ...pack,
-    isBuiltIn: true,
-    source: pack.source || 'built-in',
-    tokensCss: fullTokensCss,
-    kitCode: buildReactKitModule(pack),
-    elements: Array.isArray(pack.customElements) ? pack.customElements : buildStandardElements(pack),
-  };
-});
+export const BUILT_IN_UI_LIBRARIES = RAW_PACKS
+  .filter((pack) => {
+    if (HIDE_OTHER_SOURCES && HARD_DELETE) {
+      return KEEP_INDEXED_LIBRARY_IDS.includes(pack.id);
+    }
+    return true;
+  })
+  .map((pack) => {
+    const isKeptIndexed = KEEP_INDEXED_LIBRARY_IDS.includes(pack.id);
+    const archived = HIDE_OTHER_SOURCES ? !isKeptIndexed : false;
+    const fullTokensCss = `${pack.fontsUrl ? `@import url('${pack.fontsUrl}');\n` : ''}${SHARED_UI_BASE_CSS}\n${pack.tokensCss}`;
+    return {
+      ...pack,
+      isBuiltIn: true,
+      archived,
+      manifestSource: isKeptIndexed ? 'indexed' : 'custom',
+      framework: pack.catalogType === 'html' ? 'html' : (pack.id === 'awesome-components' ? 'mixed' : 'react'),
+      tailwindVersion: PREVIEW_KIT_MANIFEST.tailwindVersion,
+      pinnedCommit: PINNED_INDEXED_COMMITS[pack.id] || '',
+      source: pack.source || 'built-in',
+      tokensCss: fullTokensCss,
+      kitCode: buildReactKitModule(pack),
+      elements: Array.isArray(pack.customElements) ? pack.customElements : buildStandardElements(pack),
+    };
+  });

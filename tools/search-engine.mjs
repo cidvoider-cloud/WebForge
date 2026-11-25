@@ -34,11 +34,16 @@ export function unwrapDuckDuckGoUrl(rawHref = '') {
   try {
     const normalized = href.startsWith('//') ? `https:${href}` : href.startsWith('/') ? `https://duckduckgo.com${href}` : href;
     const u = new URL(normalized);
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return '';
     const uddg = u.searchParams.get('uddg');
-    if (uddg) return decodeURIComponent(uddg);
-    return normalized;
+    if (uddg) {
+      const decoded = decodeURIComponent(uddg);
+      const target = new URL(decoded);
+      return target.protocol === 'https:' || target.protocol === 'http:' ? target.toString() : '';
+    }
+    return u.toString();
   } catch {
-    return href;
+    return '';
   }
 }
 
@@ -297,56 +302,54 @@ export async function runKeylessWebSearch(rawQuery, { limit = 6 } = {}) {
 /**
  * Parse any GitHub repository URL or owner/repo shorthand into structured coordinates.
  */
+const SAFE_GH_SEGMENT = /^[A-Za-z0-9_.-]+$/;
+
+function sanitizeGitHubCoords(owner, repo, branch = '', filePath = '', kind = 'repo') {
+  const cleanOwner = String(owner || '').trim();
+  const cleanRepo = String(repo || '').replace(/\.git$/i, '').trim();
+  const cleanBranch = String(branch || '').trim();
+  const cleanPath = String(filePath || '').replace(/^\/+|\/+$/g, '');
+
+  if (!SAFE_GH_SEGMENT.test(cleanOwner) || cleanOwner === '.' || cleanOwner === '..') return null;
+  if (!SAFE_GH_SEGMENT.test(cleanRepo) || cleanRepo === '.' || cleanRepo === '..') return null;
+  if (cleanBranch && (!/^[A-Za-z0-9._/-]+$/.test(cleanBranch) || cleanBranch.includes('..'))) return null;
+  if (cleanPath && (cleanPath.includes('..') || cleanPath.includes('\\') || cleanPath.includes('\0'))) return null;
+
+  return { owner: cleanOwner, repo: cleanRepo, branch: cleanBranch, filePath: cleanPath, kind };
+}
+
 export function parseGitHubSkillTarget(rawInput = '') {
   const input = String(rawInput || '').trim();
-  if (!input) return null;
+  if (!input || input.length > 512) return null;
 
   // Raw URL: https://raw.githubusercontent.com/owner/repo/branch/path/to/file.md
-  const rawMatch = input.match(/^https?:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)$/i);
+  const rawMatch = input.match(/^https?:\/\/raw\.githubusercontent\.com\/([^/?#]+)\/([^/?#]+)\/([^/?#]+)\/([^?#]+)(?:[?#].*)?$/i);
   if (rawMatch) {
-    return {
-      owner: rawMatch[1],
-      repo: rawMatch[2].replace(/\.git$/i, ''),
-      branch: rawMatch[3],
-      filePath: rawMatch[4],
-      kind: 'file',
-    };
+    return sanitizeGitHubCoords(rawMatch[1], rawMatch[2], rawMatch[3], rawMatch[4], 'file');
   }
 
-  // GitHub blob/tree URL
-  const blobMatch = input.match(/(?:https?:\/\/)?(?:www\.)?github\.com\/([^/]+)\/([^/]+)\/(blob|tree)\/([^/]+)\/(.+?)(?:[?#].*)?$/i);
+  // GitHub blob/tree URL (strictly anchored to github.com host)
+  const blobMatch = input.match(/^(?:https?:\/\/)?(?:www\.)?github\.com\/([^/?#]+)\/([^/?#]+)\/(blob|tree)\/([^/?#]+)\/([^?#]+?)(?:[?#].*)?$/i);
   if (blobMatch) {
-    return {
-      owner: blobMatch[1],
-      repo: blobMatch[2].replace(/\.git$/i, ''),
-      branch: blobMatch[4],
-      filePath: blobMatch[5].replace(/\/+$/, ''),
-      kind: blobMatch[3].toLowerCase() === 'blob' ? 'file' : 'dir',
-    };
+    return sanitizeGitHubCoords(
+      blobMatch[1],
+      blobMatch[2],
+      blobMatch[4],
+      blobMatch[5],
+      blobMatch[3].toLowerCase() === 'blob' ? 'file' : 'dir'
+    );
   }
 
-  // Standard GitHub repo URL
-  const repoMatch = input.match(/(?:https?:\/\/)?(?:www\.)?github\.com\/([^/]+)\/([^/?#]+)(?:[/?#].*)?$/i);
+  // Standard GitHub repo URL (strictly anchored to github.com host)
+  const repoMatch = input.match(/^(?:https?:\/\/)?(?:www\.)?github\.com\/([^/?#]+)\/([^/?#]+)(?:\/?(?:[?#].*)?)?$/i);
   if (repoMatch) {
-    return {
-      owner: repoMatch[1],
-      repo: repoMatch[2].replace(/\.git$/i, ''),
-      branch: '',
-      filePath: '',
-      kind: 'repo',
-    };
+    return sanitizeGitHubCoords(repoMatch[1], repoMatch[2], '', '', 'repo');
   }
 
   // Shorthand: owner/repo
   const shortMatch = input.match(/^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/);
   if (shortMatch) {
-    return {
-      owner: shortMatch[1],
-      repo: shortMatch[2].replace(/\.git$/i, ''),
-      branch: '',
-      filePath: '',
-      kind: 'repo',
-    };
+    return sanitizeGitHubCoords(shortMatch[1], shortMatch[2], '', '', 'repo');
   }
 
   return null;

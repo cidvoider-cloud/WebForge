@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+  <base href="/">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WebForge — AI Website Builder</title>
@@ -9,10 +10,11 @@
   <meta property="og:description" content="WebForge is a free, open-source AI website builder that runs in your browser. Chat a prompt, get a live React site preview.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:ital,wght@0,500..800;1,600..800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Bricolage+Grotesque:wght@600;700&family=Cormorant+Garamond:wght@600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..700&family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Instrument+Serif&family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@500;600&family=Outfit:wght@600;700&family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:ital,wght@0,500..800;1,600..800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/prompt-builder.css">
-  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <link rel="stylesheet" href="css/settings.css">
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js" onerror="var s=document.createElement('script');s.src='vendor/preview-kit/lucide.min.js';s.onload=function(){if(window.lucide)window.lucide.createIcons();};document.head.appendChild(s);"></script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%23111113'/%3E%3Cpath d='M25 32 L38 70 L50 44 L62 70 L75 32' fill='none' stroke='%23FAFAFA' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 </head>
 <body>
@@ -26,50 +28,42 @@
           <div class="logo-mark" aria-hidden="true"><i data-lucide="layers"></i></div>
           <span class="brand-wordmark">WebForge</span>
         </div>
-        <button type="button" class="icon-btn mobile-only" id="btnCloseHomeDrawer" aria-label="Close navigation drawer">
-          <i data-lucide="x"></i>
-        </button>
+        <div class="home-sidebar-brand-actions">
+          <button type="button" class="icon-btn desktop-only" id="btnCollapseHomeSidebar" title="Collapse sidebar (Ctrl+B)" aria-label="Collapse sidebar">
+            <i data-lucide="panel-left-close"></i>
+          </button>
+          <button type="button" class="icon-btn mobile-only" id="btnCloseHomeDrawer" aria-label="Close navigation drawer">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
       </div>
 
       <nav class="home-nav">
         <button type="button" class="home-nav-item active">
-          <i data-lucide="layout-dashboard"></i>
+          <span class="kb-nav-slot" data-kubai-icon="dashboard" data-kubai-size="18"></span>
           <span>Dashboard</span>
         </button>
         <button type="button" class="home-nav-item" id="btnOpenPromptBuilderHomeSidebar">
-          <i data-lucide="wand-sparkles"></i>
-          <span>Prompt Builder</span>
+          <span class="kb-nav-slot" data-kubai-icon="prompt-builder" data-kubai-size="18"></span>
+          <span>Prompt builder</span>
         </button>
         <button type="button" class="home-nav-item" id="btnOpenUiLibraryHomeSidebar">
-          <i data-lucide="blocks"></i>
-          <span>UI Library</span>
-        </button>
-        <button type="button" class="home-nav-item" id="btnOpenSystemDrawerHome">
-          <i data-lucide="sliders-horizontal"></i>
-          <span>System Instructions</span>
-        </button>
-        <button type="button" class="home-nav-item" id="btnOpenCommandHome">
-          <i data-lucide="command"></i>
-          <span>Command Palette</span>
-          <kbd class="kbd-hint">Ctrl+K</kbd>
-        </button>
-        <button type="button" class="home-nav-item" id="btnOpenSettingsHome">
-          <i data-lucide="settings"></i>
-          <span>Model &amp; Provider</span>
+          <span class="kb-nav-slot" data-kubai-icon="ui-library" data-kubai-size="18"></span>
+          <span>UI library</span>
         </button>
       </nav>
 
-      <div class="home-nav-section">Recent Projects</div>
+      <div class="home-nav-section">Recent projects</div>
       <div class="home-nav-projects" id="homeSidebarProjects"></div>
 
       <div class="home-sidebar-footer">
-        <button type="button" class="btn btn-primary btn-full" id="btnNewProjectHome">
-          <i data-lucide="plus"></i>
-          <span>New Project</span>
+        <button type="button" class="home-nav-item" id="btnOpenSettingsHome">
+          <span class="kb-nav-slot" data-kubai-icon="settings" data-kubai-size="18"></span>
+          <span>Settings</span>
         </button>
-        <button type="button" class="home-nav-item" data-theme-toggle aria-label="Switch theme">
-          <span class="theme-icon"><i data-lucide="sun"></i></span>
-          <span class="theme-label">Light mode</span>
+        <button type="button" class="btn btn-outline" id="btnNewProjectHome">
+          <span class="kb-nav-slot" data-kubai-icon="new-project" data-kubai-size="18"></span>
+          <span>New project</span>
         </button>
       </div>
     </aside>
@@ -80,16 +74,26 @@
           <button type="button" class="icon-btn mobile-only" id="btnHomeNavToggle" aria-label="Open navigation menu">
             <i data-lucide="menu"></i>
           </button>
-          <span class="home-topbar-title">Studio Dashboard</span>
+          <button type="button" class="icon-btn sidebar-reopen-btn" id="btnExpandHomeSidebar" title="Open sidebar (Ctrl+B)" aria-label="Open sidebar">
+            <i data-lucide="panel-left-open"></i>
+          </button>
+          <span class="home-topbar-title">Studio</span>
         </div>
         <div class="home-topbar-actions">
-          <button type="button" class="model-status-btn" id="homeModelBtn" title="Configure AI Provider and Model">
-            <i data-lucide="cpu"></i>
-            <span id="homeModelLabel">Select model</span>
-          </button>
-          <button type="button" class="icon-btn" data-theme-toggle title="Toggle Light/Dark Theme" aria-label="Toggle theme">
-            <span class="theme-icon"><i data-lucide="sun"></i></span>
-          </button>
+          <div class="home-model-wrap" id="homeModelWrap">
+            <button type="button" class="model-status-btn" id="homeModelBtn" aria-haspopup="menu" aria-expanded="false" title="Switch active model">
+              <i data-lucide="cpu"></i>
+              <span id="homeModelLabel">Select model</span>
+              <i data-lucide="chevron-down" class="home-model-chevron"></i>
+            </button>
+            <div class="home-model-popover" id="homeModelPopover" hidden role="menu" aria-label="Quick switch model">
+              <div class="home-model-pop-head">Active model</div>
+              <div class="home-model-pop-list" id="homeModelPopoverList"></div>
+              <div class="home-model-pop-foot">
+                <button type="button" class="st-btn st-btn-secondary st-btn-full" id="btnHomeManageProviders" role="menuitem">Manage providers</button>
+              </div>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -101,102 +105,97 @@
           </div>
 
           <div class="home-hero">
-            <button type="button" class="home-hero-announcement" id="btnHeroUiCatalog" title="Explore 6,345+ interactive UI components">
-              <i data-lucide="sparkles"></i>
-              <span>6,345+ UI Components</span>
-              <i data-lucide="arrow-right" class="home-hero-announcement-arrow"></i>
-            </button>
-
             <h1 class="home-hero-title">What will you <em class="hero-accent-word">build</em> today?</h1>
-            <p class="home-hero-sub">Create stunning apps &amp; websites locally by chatting with AI.</p>
+            <p class="home-hero-sub">Create apps and websites locally by chatting with AI.</p>
 
             <div class="home-prompt-box">
               <div class="attachments-row hidden" id="homeAttachmentsRow"></div>
-              <textarea id="homePromptInput" placeholder="What do you want to build?" rows="3" aria-label="Describe what you want to build"></textarea>
+              <textarea id="homePromptInput" placeholder="Describe what you want to build…" rows="3" aria-label="Describe what you want to build"></textarea>
               <div class="home-prompt-actions">
-                <label class="composer-circle-btn" for="homeAttachInput" title="Attach image or screenshot" aria-label="Attach image">
-                  <i data-lucide="plus"></i>
-                </label>
-                <input type="file" id="homeAttachInput" accept="image/png,image/jpeg,image/webp,image/gif" multiple class="sr-only">
+                <div class="composer-bar-left">
+                  <label class="composer-circle-btn" for="homeAttachInput" title="Attach image" aria-label="Attach image">
+                    <i data-lucide="plus"></i>
+                  </label>
+                  <input type="file" id="homeAttachInput" accept="image/png,image/jpeg,image/webp,image/gif" multiple class="sr-only">
 
-                <button type="button" class="composer-model-btn" id="homeComposerModelBtn" title="Switch AI Provider &amp; Model" aria-label="Configure AI model">
-                  <i data-lucide="zap"></i>
-                  <span id="homeComposerModelLabel">Select model</span>
-                  <i data-lucide="chevron-down" class="composer-model-chevron"></i>
-                </button>
-
-                <button type="button" class="composer-icon-btn composer-wand-btn" id="btnOpenPromptBuilderHome" title="Prompt Builder — Guided visual prompt wizard" aria-label="Open Prompt Builder">
-                  <i data-lucide="wand-sparkles"></i>
-                </button>
-
-                <div class="composer-tools-wrap" id="homeToolsWrap">
-                  <button type="button" class="composer-icon-btn composer-tools-btn" id="btnHomeToolsMenu" aria-haspopup="true" aria-expanded="false" aria-label="Prompt settings: Web Search, Sub-Agents, System" title="Web Search, Sub-Agents &amp; System">
-                    <i data-lucide="sliders-horizontal"></i>
-                    <span class="tools-active-dot" aria-hidden="true"></span>
-                  </button>
-                  <div class="composer-tools-popover hidden" id="homeToolsPopover" role="menu" aria-label="Prompt controls">
-                    <div class="tools-popover-head">Agent &amp; Search Controls</div>
-                    <label class="tools-popover-toggle">
-                      <span class="tools-popover-icon"><i data-lucide="globe"></i></span>
-                      <span class="tools-popover-copy">
-                        <strong>Web Search</strong>
-                        <small>Free keyless search grounding</small>
-                      </span>
-                      <input type="checkbox" class="m3-switch m3-switch-sm" id="toggleHomeWebSearch" checked aria-label="Toggle Web Search">
-                    </label>
-                    <label class="tools-popover-toggle">
-                      <span class="tools-popover-icon"><i data-lucide="git-fork"></i></span>
-                      <span class="tools-popover-copy">
-                        <strong>Sub-Agents</strong>
-                        <small>Parallel builds, auto fallback</small>
-                      </span>
-                      <input type="checkbox" class="m3-switch m3-switch-sm" id="toggleHomeSubAgents" checked aria-label="Toggle Sub-Agents">
-                    </label>
-                    <div class="tools-popover-divider"></div>
-                    <button type="button" class="tools-popover-action" id="btnHomePopoverUiLibrary" role="menuitem">
-                      <span class="tools-popover-icon"><i data-lucide="blocks"></i></span>
-                      <span class="tools-popover-copy">
-                        <strong>UI Library</strong>
-                        <small id="homePopoverUiLibraryName">SaaS Modern</small>
-                      </span>
-                      <i data-lucide="chevron-right" class="tools-popover-chevron"></i>
+                  <div class="composer-tools-wrap" id="homeToolsWrap">
+                    <button type="button" class="composer-icon-btn composer-tools-btn" id="btnHomeToolsMenu" aria-haspopup="true" aria-expanded="false" aria-label="More prompt options" title="More options">
+                      <i data-lucide="more-horizontal"></i>
+                      <span class="tools-active-dot" aria-hidden="true"></span>
                     </button>
-                    <button type="button" class="tools-popover-action" id="btnHomePopoverSystem" role="menuitem">
-                      <span class="tools-popover-icon"><i data-lucide="sparkles"></i></span>
-                      <span class="tools-popover-copy">
-                        <strong>System &amp; Skills</strong>
-                        <small>Instructions, Ponytail &amp; GitHub skills</small>
-                      </span>
-                      <span class="tools-popover-badge tabular-nums" id="homePopoverSkillsCount">3</span>
-                      <i data-lucide="chevron-right" class="tools-popover-chevron"></i>
-                    </button>
+                    <div class="composer-tools-popover hidden" id="homeToolsPopover" role="menu" aria-label="Prompt options">
+                      <div class="tools-popover-head">Agent options</div>
+                      <label class="tools-popover-toggle">
+                        <span class="tools-popover-icon"><i data-lucide="globe"></i></span>
+                        <span class="tools-popover-copy">
+                          <strong>Web search</strong>
+                          <small>Keyless search grounding</small>
+                        </span>
+                        <input type="checkbox" class="m3-switch m3-switch-sm" id="toggleHomeWebSearch" checked aria-label="Toggle Web Search">
+                      </label>
+                      <label class="tools-popover-toggle">
+                        <span class="tools-popover-icon"><i data-lucide="git-fork"></i></span>
+                        <span class="tools-popover-copy">
+                          <strong>Sub-agents</strong>
+                          <small>Parallel builds with fallback</small>
+                        </span>
+                        <input type="checkbox" class="m3-switch m3-switch-sm" id="toggleHomeSubAgents" checked aria-label="Toggle Sub-Agents">
+                      </label>
+                      <div class="tools-popover-divider"></div>
+                      <button type="button" class="tools-popover-action" id="btnHomePopoverUiLibrary" role="menuitem">
+                        <span class="tools-popover-icon"><i data-lucide="blocks"></i></span>
+                        <span class="tools-popover-copy">
+                          <strong>Attach component</strong>
+                          <small id="homePopoverUiLibraryName">SaaS Modern</small>
+                        </span>
+                        <i data-lucide="chevron-right" class="tools-popover-chevron"></i>
+                      </button>
+                      <button type="button" class="tools-popover-action" id="btnOpenCommandHome" role="menuitem">
+                        <span class="tools-popover-icon"><i data-lucide="command"></i></span>
+                        <span class="tools-popover-copy">
+                          <strong>Command palette</strong>
+                          <small>Quick actions (Ctrl+K)</small>
+                        </span>
+                        <kbd class="kbd-hint">Ctrl+K</kbd>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                <div class="spacer"></div>
-                <span class="token-hint tabular-nums" id="homeTokenHint">0 tok</span>
+                <div class="composer-bar-right">
+                  <div class="token-ring-wrap" id="homeTokenRingWrap">
+                    <button type="button" class="token-ring-btn" id="homeTokenRingBtn" data-level="ok" aria-label="Context token usage: 0%" aria-describedby="homeTokenTooltip">
+                      <svg class="token-ring-svg" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle class="token-ring-track" cx="12" cy="12" r="9.5"></circle>
+                        <circle class="token-ring-fill" id="homeTokenRingCircle" cx="12" cy="12" r="9.5" stroke-dasharray="59.69" stroke-dashoffset="59.69"></circle>
+                      </svg>
+                    </button>
+                    <div class="token-ring-tooltip" id="homeTokenTooltip" role="tooltip">
+                      <div class="ctx-pop-head">
+                        <span>Context Usage</span>
+                        <strong class="tabular-nums">0%</strong>
+                      </div>
+                      <div class="ctx-pop-total tabular-nums">0 / 32,768 tok</div>
+                    </div>
+                  </div>
 
-                <button type="button" class="composer-plan-btn" id="btnHomePlanToggle" aria-pressed="false" title="Toggle Plan Mode — Generate an editable plan before building">
-                  <i data-lucide="clipboard-list"></i>
-                  <span>Plan</span>
-                </button>
+                  <button type="button" class="composer-plan-btn" id="btnHomePlanToggle" aria-pressed="false" title="Plan before building">
+                    <i data-lucide="clipboard-list"></i>
+                    <span class="plan-btn-label">Plan</span>
+                  </button>
 
-                <button type="button" class="home-send-btn" id="homeSendBtn" aria-label="Build now">
-                  <span id="homeSendBtnLabel">Build now</span>
-                  <i data-lucide="send-horizontal"></i>
-                </button>
+                  <button type="button" class="home-send-btn" id="homeSendBtn" aria-label="Build">
+                    <span id="homeSendBtnLabel">Build</span>
+                    <i data-lucide="arrow-right"></i>
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div class="home-import-row" aria-label="Quick start sources">
-              <span class="home-import-label">or import from</span>
-              <button type="button" class="home-import-pill" id="btnHomeQuickUiLib">
-                <i data-lucide="blocks"></i>
-                <span>UI Library</span>
-              </button>
-              <button type="button" class="home-import-pill" id="btnHomeQuickGithub">
+            <div class="home-import-row" aria-label="Import source">
+              <button type="button" class="btn btn-ghost btn-sm home-import-link" id="btnHomeQuickGithub">
                 <i data-lucide="github"></i>
-                <span>GitHub</span>
+                <span>Import from GitHub</span>
               </button>
             </div>
           </div>
@@ -213,10 +212,6 @@
                 <i data-lucide="search"></i>
                 <input type="search" id="homeProjectSearch" placeholder="Filter projects…" aria-label="Filter projects">
               </div>
-              <button type="button" class="btn btn-outline" id="btnNewProjectHomeGrid">
-                <i data-lucide="plus"></i>
-                <span>New Project</span>
-              </button>
             </div>
           </div>
           <div class="home-projects-grid" id="homeProjectsGrid"></div>
@@ -259,32 +254,35 @@
       </div>
 
       <div class="topbar-zone-right">
-        <button type="button" class="btn btn-ghost" id="btnOpenUiLibraryTopbar" title="Browse & apply UI Component Libraries">
+        <button type="button" class="btn btn-ghost" id="btnOpenUiLibraryTopbar" title="Browse and apply UI component libraries">
           <i data-lucide="blocks"></i>
-          <span>UI Library</span>
+          <span>UI library</span>
         </button>
         <button type="button" class="btn btn-ghost" id="btnCheckpointsModal" title="Manage file checkpoints">
           <i data-lucide="history"></i>
           <span>Checkpoints</span>
           <span class="cp-count tabular-nums"></span>
         </button>
-        <button type="button" class="btn btn-ghost" id="btnOpenSystemDrawer" title="Edit system prompt and active skills">
-          <i data-lucide="sliders-horizontal"></i>
-          <span>System</span>
-        </button>
-        <button type="button" class="btn btn-ghost" id="btnCommandPalette" title="Command Palette (Ctrl+K)">
-          <i data-lucide="command"></i>
-          <span>Commands</span>
-        </button>
-        <button type="button" class="icon-btn" data-theme-toggle title="Toggle Light/Dark Theme" aria-label="Toggle theme">
-          <span class="theme-icon"><i data-lucide="sun"></i></span>
-        </button>
-        <button type="button" class="icon-btn" id="btnOpenSettings" title="AI Provider & Model Settings" aria-label="Settings">
-          <i data-lucide="settings"></i>
-        </button>
+        <div class="toolbar-more-wrap" id="topbarMoreWrap">
+          <button type="button" class="icon-btn" id="btnTopbarMore" aria-haspopup="true" aria-expanded="false" aria-label="More workspace actions" title="More actions">
+            <i data-lucide="more-horizontal"></i>
+          </button>
+          <div class="toolbar-more-menu hidden" id="topbarMoreMenu" role="menu" aria-label="More workspace actions">
+            <button type="button" class="toolbar-more-item" id="btnCommandPalette" role="menuitem">
+              <i data-lucide="command"></i>
+              <span>Command palette</span>
+              <kbd class="kbd-hint">Ctrl+K</kbd>
+            </button>
+            <button type="button" class="toolbar-more-item" id="btnOpenSettings" role="menuitem">
+              <i data-lucide="settings"></i>
+              <span>Settings</span>
+              <kbd class="kbd-hint">Ctrl+,</kbd>
+            </button>
+          </div>
+        </div>
         <button type="button" class="btn btn-primary" id="btnExportZip" title="Export Vite project ZIP">
           <i data-lucide="archive"></i>
-          <span>Export ZIP</span>
+          <span>Export</span>
         </button>
       </div>
     </header>
@@ -297,14 +295,7 @@
         <div class="composer-dock">
           <div class="skills-and-meter-row">
             <div class="skills-row" id="skillsIndicatorRow"></div>
-
-            <div class="context-budget-wrap" id="contextBudgetWrap">
-              <button type="button" class="context-budget-meter" id="contextBudgetMeter" data-level="ok" title="Estimated token usage in context window">
-                <div class="context-meter-bar"><div class="context-meter-fill" id="contextMeterFill"></div></div>
-                <span class="context-meter-text tabular-nums" id="contextMeterText">0% · 0 / 32,768 tok</span>
-              </button>
-              <div class="context-budget-popover hidden" id="contextBudgetPopover"></div>
-            </div>
+            <span class="status-text hidden" id="statusInfo" aria-live="polite"></span>
           </div>
 
           <div class="pinned-files-strip hidden" id="pinnedFilesStrip"></div>
@@ -319,80 +310,85 @@
               <div class="attachments-row hidden" id="wsAttachmentsRow"></div>
               <textarea id="chatInput" placeholder="Describe changes, paste a screenshot, or debug… (Enter to Send)" rows="1" autocomplete="off"></textarea>
               <div class="composer-actions">
-                <label class="composer-icon-btn" for="wsAttachInput" title="Attach image" aria-label="Attach image">
-                  <i data-lucide="image-plus"></i>
-                </label>
-                <input type="file" id="wsAttachInput" accept="image/png,image/jpeg,image/webp,image/gif" multiple class="sr-only">
+                <div class="composer-bar-left">
+                  <label class="composer-icon-btn" for="wsAttachInput" title="Attach image" aria-label="Attach image">
+                    <i data-lucide="plus"></i>
+                  </label>
+                  <input type="file" id="wsAttachInput" accept="image/png,image/jpeg,image/webp,image/gif" multiple class="sr-only">
 
-                <button type="button" class="composer-icon-btn" id="btnWsPromptBuilder" title="Prompt Builder — Guided visual prompt wizard" aria-label="Open Prompt Builder">
-                  <i data-lucide="wand-sparkles"></i>
-                </button>
-
-                <button type="button" class="ws-plan-toggle" id="btnWsPlanToggle" aria-pressed="false" title="Toggle Plan Mode — Generate an editable plan before building">
-                  <i data-lucide="clipboard-list"></i>
-                  <span>Plan</span>
-                </button>
-
-                <div class="composer-tools-wrap" id="wsToolsWrap">
-                  <button type="button" class="composer-icon-btn composer-tools-btn" id="btnWsToolsMenu" aria-haspopup="true" aria-expanded="false" aria-label="Prompt settings: Web Search, Sub-Agents, System" title="Web Search, Sub-Agents & System">
-                    <i data-lucide="sliders-horizontal"></i>
-                    <span class="tools-active-dot" aria-hidden="true"></span>
+                  <button type="button" class="composer-icon-btn composer-wand-btn-sm" id="btnWsPromptBuilder" title="Prompt Builder — Guided visual prompt wizard" aria-label="Open Prompt Builder">
+                    <i data-lucide="wand-sparkles"></i>
                   </button>
-                  <div class="composer-tools-popover popover-up hidden" id="wsToolsPopover" role="menu" aria-label="Workspace prompt controls">
-                    <div class="tools-popover-head">Agent &amp; Search Controls</div>
-                    <label class="tools-popover-toggle">
-                      <span class="tools-popover-icon"><i data-lucide="globe"></i></span>
-                      <span class="tools-popover-copy">
-                        <strong>Web Search</strong>
-                        <small>Free keyless search grounding</small>
-                      </span>
-                      <input type="checkbox" class="m3-switch m3-switch-sm" id="toggleWsWebSearch" checked aria-label="Toggle Web Search">
-                    </label>
-                    <label class="tools-popover-toggle">
-                      <span class="tools-popover-icon"><i data-lucide="git-fork"></i></span>
-                      <span class="tools-popover-copy">
-                        <strong>Sub-Agents</strong>
-                        <small>Parallel builds, auto fallback</small>
-                      </span>
-                      <input type="checkbox" class="m3-switch m3-switch-sm" id="toggleWsSubAgents" checked aria-label="Toggle Sub-Agents">
-                    </label>
-                    <div class="tools-popover-divider"></div>
-                    <button type="button" class="tools-popover-action" id="btnWsPopoverUiLibrary" role="menuitem">
-                      <span class="tools-popover-icon"><i data-lucide="blocks"></i></span>
-                      <span class="tools-popover-copy">
-                        <strong>UI Library</strong>
-                        <small id="wsPopoverUiLibraryName">SaaS Modern</small>
-                      </span>
-                      <i data-lucide="chevron-right" class="tools-popover-chevron"></i>
+
+                  <div class="composer-tools-wrap" id="wsToolsWrap">
+                    <button type="button" class="composer-icon-btn composer-tools-btn" id="btnWsToolsMenu" aria-haspopup="true" aria-expanded="false" aria-label="Prompt menu: Model, Web Search, Sub-Agents, System" title="Model, Web Search, Sub-Agents &amp; System">
+                      <i data-lucide="more-horizontal"></i>
+                      <span class="tools-active-dot" aria-hidden="true"></span>
                     </button>
-                    <button type="button" class="tools-popover-action" id="btnWsPopoverSystem" role="menuitem">
-                      <span class="tools-popover-icon"><i data-lucide="sparkles"></i></span>
-                      <span class="tools-popover-copy">
-                        <strong>System &amp; Skills</strong>
-                        <small>Instructions, Ponytail &amp; GitHub skills</small>
-                      </span>
-                      <span class="tools-popover-badge tabular-nums" id="wsPopoverSkillsCount">3</span>
-                      <i data-lucide="chevron-right" class="tools-popover-chevron"></i>
-                    </button>
-                    <button type="button" class="tools-popover-action chip-autofix" id="btnAutoFix" role="menuitem" title="Verify preview and auto-fix errors">
-                      <span class="tools-popover-icon"><i data-lucide="wrench"></i></span>
-                      <span class="tools-popover-copy">
-                        <strong class="btn-label">Verify &amp; Fix</strong>
-                        <small>Inspect preview &amp; auto-repair errors</small>
-                      </span>
-                      <i data-lucide="chevron-right" class="tools-popover-chevron"></i>
-                    </button>
+                    <div class="composer-tools-popover popover-up hidden" id="wsToolsPopover" role="menu" aria-label="Workspace prompt controls">
+                      <div class="tools-popover-head">Model &amp; Agent Controls</div>
+                      <button type="button" class="tools-popover-action" id="btnWsPopoverModel" role="menuitem">
+                        <span class="tools-popover-icon tools-popover-icon-accent"><i data-lucide="zap"></i></span>
+                        <span class="tools-popover-copy">
+                          <strong>Select Model</strong>
+                          <small id="wsPopoverModelName" class="truncate">Select model</small>
+                        </span>
+                        <i data-lucide="chevron-right" class="tools-popover-chevron"></i>
+                      </button>
+                      <div class="tools-popover-divider"></div>
+                      <label class="tools-popover-toggle">
+                        <span class="tools-popover-icon"><i data-lucide="globe"></i></span>
+                        <span class="tools-popover-copy">
+                          <strong>Web Search</strong>
+                          <small>Free keyless search grounding</small>
+                        </span>
+                        <input type="checkbox" class="m3-switch m3-switch-sm" id="toggleWsWebSearch" checked aria-label="Toggle Web Search">
+                      </label>
+                      <label class="tools-popover-toggle">
+                        <span class="tools-popover-icon"><i data-lucide="git-fork"></i></span>
+                        <span class="tools-popover-copy">
+                          <strong>Sub-Agents</strong>
+                          <small>Parallel builds, auto fallback</small>
+                        </span>
+                        <input type="checkbox" class="m3-switch m3-switch-sm" id="toggleWsSubAgents" checked aria-label="Toggle Sub-Agents">
+                      </label>
+                      <div class="tools-popover-divider"></div>
+                      <button type="button" class="tools-popover-action chip-autofix" id="btnAutoFix" role="menuitem" title="Verify preview and auto-fix errors">
+                        <span class="tools-popover-icon"><i data-lucide="wrench"></i></span>
+                        <span class="tools-popover-copy">
+                          <strong class="btn-label">Verify &amp; fix</strong>
+                          <small>Inspect preview and repair errors</small>
+                        </span>
+                        <i data-lucide="chevron-right" class="tools-popover-chevron"></i>
+                      </button>
+                    </div>
                   </div>
+
+                  <button type="button" class="chip chip-retry hidden" id="btnRetryGen" title="Retry interrupted build">
+                    <i data-lucide="rotate-cw"></i>
+                    <span>Retry</span>
+                  </button>
                 </div>
 
-                <button type="button" class="chip chip-retry hidden" id="btnRetryGen" title="Retry interrupted build">
-                  <i data-lucide="rotate-cw"></i>
-                  <span>Retry</span>
-                </button>
-                <div class="spacer"></div>
-                <span class="status-text" id="statusInfo">Ready</span>
-                <button type="button" class="send-btn" id="chatSend" title="Send prompt" aria-label="Send prompt"><i data-lucide="send"></i></button>
-                <button type="button" class="stop-btn" id="btnStop" style="display:none" title="Stop generation" aria-label="Stop generation"><i data-lucide="square"></i></button>
+                <div class="composer-bar-right">
+                  <div class="token-ring-wrap context-budget-wrap" id="contextBudgetWrap">
+                    <button type="button" class="token-ring-btn token-ring-btn-sm" id="contextBudgetMeter" data-level="ok" aria-label="Context window usage: 0%" aria-describedby="contextBudgetPopover">
+                      <svg class="token-ring-svg" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle class="token-ring-track" cx="12" cy="12" r="9.5"></circle>
+                        <circle class="token-ring-fill" id="wsTokenRingCircle" cx="12" cy="12" r="9.5" stroke-dasharray="59.69" stroke-dashoffset="59.69"></circle>
+                      </svg>
+                    </button>
+                    <div class="token-ring-tooltip context-budget-popover" id="contextBudgetPopover" role="tooltip"></div>
+                  </div>
+
+                  <button type="button" class="ws-plan-toggle" id="btnWsPlanToggle" aria-pressed="false" title="Toggle Plan Mode — Generate an editable plan before building">
+                    <i data-lucide="clipboard-list"></i>
+                    <span class="plan-btn-label">Plan</span>
+                  </button>
+
+                  <button type="button" class="send-btn" id="chatSend" title="Send prompt" aria-label="Send prompt"><i data-lucide="arrow-up"></i></button>
+                  <button type="button" class="stop-btn" id="btnStop" style="display:none" title="Stop generation" aria-label="Stop generation"><i data-lucide="square"></i></button>
+                </div>
               </div>
             </div>
           </div>
@@ -404,6 +400,23 @@
 
       <!-- RIGHT WORKSPACE STAGE -->
       <section class="workspace">
+        <!-- LOVABLE-STYLE AGENT ACTIVITY SECOND SIDE SCREEN -->
+        <aside id="agentActivityDrawer" class="agent-activity-drawer hidden" aria-label="AI Agent Activity Inspector">
+          <div class="activity-drawer-head">
+            <div class="activity-drawer-title-group">
+              <span class="activity-drawer-spinner" id="activityDrawerStatusIcon" aria-hidden="true"></span>
+              <div class="activity-drawer-titles">
+                <h3 id="activityDrawerTitle">Agent Activity</h3>
+                <p id="activityDrawerMeta" class="tabular-nums">Inspecting live build steps</p>
+              </div>
+            </div>
+            <button type="button" class="icon-btn" id="btnCloseActivityDrawer" aria-label="Close activity panel" title="Close activity panel (Esc)">
+              <i data-lucide="x"></i>
+            </button>
+          </div>
+          <div class="activity-drawer-body" id="activityDrawerBody"></div>
+        </aside>
+
         <div class="ws-toolbar">
           <div class="seg" role="tablist" aria-label="Workspace mode">
             <button type="button" class="active" id="btnViewPreview" role="tab">Preview</button>
@@ -414,27 +427,45 @@
             </button>
           </div>
 
-          <div class="url-bar">
-            <i data-lucide="globe"></i>
-            <span class="truncate" id="workspaceProjectTitle">project</span>
-          </div>
-
+          <span class="sr-only" id="workspaceProjectTitle">project</span>
           <div class="spacer"></div>
 
-          <div class="device-btns" id="previewDeviceBtns">
-            <button type="button" class="device-btn active" data-device="desktop" title="Desktop viewport" aria-label="Desktop viewport" aria-pressed="true"><i data-lucide="monitor"></i></button>
-            <button type="button" class="device-btn" data-device="tablet" title="Tablet viewport" aria-label="Tablet viewport" aria-pressed="false"><i data-lucide="tablet"></i></button>
-            <button type="button" class="device-btn" data-device="mobile" title="Mobile viewport" aria-label="Mobile viewport" aria-pressed="false"><i data-lucide="smartphone"></i></button>
-          </div>
-
-          <button type="button" class="btn-icon btn-inspect" id="btnInspectPreview" title="Inspect element to edit with AI" aria-label="Toggle element inspector" aria-pressed="false"><i data-lucide="mouse-pointer-click"></i></button>
-          <button type="button" class="btn-icon" id="btnRefreshPreview" title="Refresh preview" aria-label="Refresh preview"><i data-lucide="refresh-cw"></i></button>
-          <button type="button" class="btn-icon" id="btnNewTabPreview" title="Open in new tab" aria-label="Open preview in new tab"><i data-lucide="external-link"></i></button>
-          <button type="button" class="btn-icon" id="btnExportHtml" title="Download standalone HTML" aria-label="Download HTML"><i data-lucide="download"></i></button>
-          <button type="button" class="btn-icon devtools-toggle-btn" id="btnToggleDevtools" title="Toggle Console, Problems & Network Drawer" aria-label="Toggle DevTools drawer">
+          <button type="button" class="btn-icon btn-inspect" id="btnInspectPreview" title="Inspect element to edit or swap" aria-label="Toggle element inspector" aria-pressed="false"><i data-lucide="mouse-pointer-click"></i></button>
+          <button type="button" class="btn-swap-toolbar" id="btnSwapSection" title="Swap section from UI Library" aria-label="Swap section">
+            <i data-lucide="replace"></i>
+            <span>Swap</span>
+          </button>
+          <button type="button" class="btn-icon devtools-toggle-btn" id="btnToggleDevtools" title="Toggle DevTools drawer" aria-label="Toggle DevTools drawer">
             <i data-lucide="terminal"></i>
             <span class="devtools-err-badge hidden tabular-nums"></span>
           </button>
+
+          <div class="toolbar-more-wrap" id="wsToolbarMoreWrap">
+            <button type="button" class="btn-icon" id="btnWsToolbarMore" aria-haspopup="true" aria-expanded="false" aria-label="More preview actions" title="Viewport and preview actions">
+              <i data-lucide="more-horizontal"></i>
+            </button>
+            <div class="toolbar-more-menu hidden" id="wsToolbarMoreMenu" role="menu" aria-label="Preview options">
+              <div class="toolbar-more-section-label">Viewport</div>
+              <div class="device-btns toolbar-more-devices" id="previewDeviceBtns">
+                <button type="button" class="device-btn active" data-device="desktop" title="Desktop viewport" aria-label="Desktop viewport" aria-pressed="true"><i data-lucide="monitor"></i></button>
+                <button type="button" class="device-btn" data-device="tablet" title="Tablet viewport" aria-label="Tablet viewport" aria-pressed="false"><i data-lucide="tablet"></i></button>
+                <button type="button" class="device-btn" data-device="mobile" title="Mobile viewport" aria-label="Mobile viewport" aria-pressed="false"><i data-lucide="smartphone"></i></button>
+              </div>
+              <div class="toolbar-more-divider"></div>
+              <button type="button" class="toolbar-more-item" id="btnRefreshPreview" role="menuitem">
+                <i data-lucide="refresh-cw"></i>
+                <span>Refresh</span>
+              </button>
+              <button type="button" class="toolbar-more-item" id="btnNewTabPreview" role="menuitem">
+                <i data-lucide="external-link"></i>
+                <span>Open tab</span>
+              </button>
+              <button type="button" class="toolbar-more-item" id="btnExportHtml" role="menuitem">
+                <i data-lucide="download"></i>
+                <span>Download HTML</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         <div class="ws-stage">
@@ -587,53 +618,8 @@
     </div>
   </div>
 
-  <!-- ============ SYSTEM INSTRUCTIONS & SKILLS DRAWER ============ -->
-  <dialog id="systemDrawerModal" class="drawer-dialog">
-    <div class="modal-header">
-      <h2><i data-lucide="sliders-horizontal"></i> System Instructions &amp; Skills</h2>
-      <button class="modal-close" type="button" aria-label="Close system instructions" onclick="this.closest('dialog').close()"><i data-lucide="x"></i></button>
-    </div>
-    <div class="modal-body system-drawer-body">
-      <div class="form-group">
-        <div class="label-row">
-          <label for="sysBaseInstructions">Global Base Instructions</label>
-          <button type="button" class="btn btn-ghost btn-sm" id="btnResetSystemBase">Reset Default</button>
-        </div>
-        <textarea id="sysBaseInstructions" rows="6" placeholder="Base instructions sent on every turn..."></textarea>
-      </div>
-
-      <div class="form-group" id="sysProjectGroup">
-        <label for="sysProjectInstructions">Project Custom Instructions (applies to active project)</label>
-        <textarea id="sysProjectInstructions" rows="4" placeholder="e.g. Use Playfair Display headings, dark emerald surfaces, and Tailwind grids..."></textarea>
-      </div>
-
-      <div class="form-group">
-        <label for="sysDrawerGithubUrl">Quick Import Skill from GitHub</label>
-        <div class="skill-import-row">
-          <input type="text" id="sysDrawerGithubUrl" placeholder="Paste GitHub repo or owner/repo (e.g. dietrichgebert/ponytail)" autocomplete="off">
-          <button type="button" class="btn btn-outline btn-sm" id="btnSysDrawerImportGithub">Scan &amp; Add</button>
-        </div>
-        <div class="gh-discover-results hidden" id="sysDrawerGithubResults"></div>
-      </div>
-
-      <div class="form-group">
-        <label>Active Skills</label>
-        <div class="sys-skills-list" id="sysDrawerSkills"></div>
-      </div>
-
-      <div class="form-group">
-        <div class="label-row">
-          <label for="sysCompiledPreview">Compiled System Prompt</label>
-          <span class="compiled-stats-label tabular-nums" id="sysCompiledStats">0 tok</span>
-        </div>
-        <pre class="sys-compiled-preview" id="sysCompiledPreview"></pre>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button type="button" class="btn btn-ghost" onclick="this.closest('dialog').close()">Cancel</button>
-      <button type="button" class="btn btn-primary" id="btnSaveSystemDrawer">Save Instructions</button>
-    </div>
-  </dialog>
+  <!-- ============ FULL-PAGE SETTINGS VIEW ============ -->
+  <div id="settingsView" class="settings-view" hidden></div>
 
   <!-- ============ CHECKPOINTS MODAL ============ -->
   <dialog id="checkpointsModal">
@@ -663,261 +649,653 @@
     <div class="palette-list" id="commandPaletteList" role="listbox"></div>
   </dialog>
 
-  <!-- ============ PROMPT BUILDER DIALOG MODAL ============ -->
-  <dialog id="promptBuilderModal">
-    <div class="modal-header">
-      <h2><i data-lucide="wand-sparkles"></i> WebForge Prompt Wizard</h2>
-      <button class="modal-close" type="button" aria-label="Close wizard" onclick="this.closest('dialog').close()"><i data-lucide="x"></i></button>
-    </div>
-    <div class="modal-body">
-      <div class="view-prompt-builder" id="viewPromptBuilder">
-        <div class="step-panel active" data-step="1">
-          <div class="step-header"><h2 class="step-title">What type of website?</h2><span class="step-counter" id="stepCounter">Step 1 of 7</span></div>
-          <p class="step-description">Choose the category that best matches your project.</p>
-
-          <div id="typeGrid">
-            <div class="style-group">
-              <div class="style-group-label">Services &amp; Business</div>
-              <div class="card-grid horizontal">
-                <div class="select-card" data-value="Business / Corporate" onclick="selectCard(this,'type')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="building-2"></i></span><div class="card-content"><div class="card-title">Business</div><div class="card-desc">Corporate, agency, consulting</div></div></div>
-                <div class="select-card" data-value="Restaurant / Cafe" onclick="selectCard(this,'type')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="utensils"></i></span><div class="card-content"><div class="card-title">Restaurant</div><div class="card-desc">Cafe, bakery, food business</div></div></div>
-                <div class="select-card" data-value="Real Estate / Property" onclick="selectCard(this,'type')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="home"></i></span><div class="card-content"><div class="card-title">Real Estate</div><div class="card-desc">Property, listings, agency</div></div></div>
-                <div class="select-card" data-value="Health / Wellness" onclick="selectCard(this,'type')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="heart-pulse"></i></span><div class="card-content"><div class="card-title">Health / Wellness</div><div class="card-desc">Spa, fitness, medical</div></div></div>
-                <div class="select-card" data-value="Law / Legal Services" onclick="selectCard(this,'type')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="scale"></i></span><div class="card-content"><div class="card-title">Law / Legal</div><div class="card-desc">Attorney, law firm, legal</div></div></div>
-                <div class="select-card" data-value="Gym / Fitness Studio" onclick="selectCard(this,'type')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="dumbbell"></i></span><div class="card-content"><div class="card-title">Gym / Fitness</div><div class="card-desc">Training, sports, wellness</div></div></div>
-              </div>
-            </div>
-            <div class="style-group">
-              <div class="style-group-label">Creative &amp; Personal</div>
-              <div class="card-grid horizontal">
-                <div class="select-card" data-value="Portfolio / Personal" onclick="selectCard(this,'type')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="briefcase"></i></span><div class="card-content"><div class="card-title">Portfolio</div><div class="card-desc">Personal, creative showcase</div></div></div>
-                <div class="select-card" data-value="Photography / Gallery" onclick="selectCard(this,'type')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="camera"></i></span><div class="card-content"><div class="card-title">Photography</div><div class="card-desc">Gallery, visual portfolio</div></div></div>
-                <div class="select-card" data-value="Blog / Magazine" onclick="selectCard(this,'type')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="newspaper"></i></span><div class="card-content"><div class="card-title">Blog / Magazine</div><div class="card-desc">Content, news, articles</div></div></div>
-                <div class="select-card" data-value="Music / Band" onclick="selectCard(this,'type')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="music"></i></span><div class="card-content"><div class="card-title">Music / Band</div><div class="card-desc">Artist, band, music studio</div></div></div>
-                <div class="select-card" data-value="Wedding / Celebration" onclick="selectCard(this,'type')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="sparkles"></i></span><div class="card-content"><div class="card-title">Wedding</div><div class="card-desc">Celebration, invitation, planner</div></div></div>
-                <div class="select-card" data-value="Travel / Tourism" onclick="selectCard(this,'type')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="plane"></i></span><div class="card-content"><div class="card-title">Travel</div><div class="card-desc">Tourism, booking, guides</div></div></div>
-              </div>
-            </div>
-            <div class="style-group">
-              <div class="style-group-label">Commerce &amp; Community</div>
-              <div class="card-grid horizontal">
-                <div class="select-card" data-value="SaaS / Landing Page" onclick="selectCard(this,'type')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="rocket"></i></span><div class="card-content"><div class="card-title">SaaS / Landing</div><div class="card-desc">Product, startup, app landing</div></div></div>
-                <div class="select-card" data-value="E-Commerce / Online Store" onclick="selectCard(this,'type')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="shopping-bag"></i></span><div class="card-content"><div class="card-title">E-Commerce</div><div class="card-desc">Online store, product catalog</div></div></div>
-                <div class="select-card" data-value="Education / Course" onclick="selectCard(this,'type')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="graduation-cap"></i></span><div class="card-content"><div class="card-title">Education</div><div class="card-desc">Course, school, e-learning</div></div></div>
-                <div class="select-card" data-value="Event / Conference" onclick="selectCard(this,'type')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="calendar"></i></span><div class="card-content"><div class="card-title">Event</div><div class="card-desc">Conference, meetup, festival</div></div></div>
-                <div class="select-card" data-value="Non-Profit / Charity" onclick="selectCard(this,'type')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="heart"></i></span><div class="card-content"><div class="card-title">Non-Profit</div><div class="card-desc">Charity, NGO, cause</div></div></div>
-                <div class="select-card" data-value="Church / Religious Organization" onclick="selectCard(this,'type')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="church"></i></span><div class="card-content"><div class="card-title">Church</div><div class="card-desc">Religious, community, ministry</div></div></div>
-              </div>
-            </div>
-          </div>
-          <div class="validation-nudge" id="typeNudge" role="alert">Please select a website type to continue.</div>
+  <!-- ============ PROMPT STUDIO DIALOG MODAL (INDUSTRIALIZED MINIMAL 2-PANE) ============ -->
+  <dialog id="promptBuilderModal" class="pb-studio-dialog" aria-label="WebForge Prompt Studio">
+    <header class="pb-studio-header">
+      <div class="pb-header-brand">
+        <span class="pb-header-icon" aria-hidden="true"><i data-lucide="wand-sparkles"></i></span>
+        <div class="pb-header-copy">
+          <h2>Prompt Studio</h2>
+          <p>Focused step-by-step architecture brief for local &amp; cloud LLMs</p>
         </div>
+      </div>
+      <div class="pb-header-actions">
+        <button type="button" class="pb-header-btn pb-mobile-preview-btn" id="btnPbTogglePreview" aria-expanded="false">
+          <i data-lucide="panel-right"></i>
+          <span>Preview &amp; Steps</span>
+        </button>
+        <button type="button" class="pb-header-btn" onclick="startOver()" title="Reset all selections">
+          <i data-lucide="rotate-ccw"></i>
+          <span>Reset</span>
+        </button>
+        <button class="modal-close" type="button" id="btnClosePromptBuilder" aria-label="Close Prompt Studio">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+    </header>
 
-        <div class="step-panel" data-step="2">
-          <div class="step-header"><h2 class="step-title">Pick a design style</h2><span class="step-counter">Step 2 of 7</span></div>
-          <p class="step-description">Select the overall aesthetic direction for your website.</p>
-          <div id="styleGrid">
-            <div class="style-group">
-              <div class="style-group-label">Clean &amp; Structured</div>
-              <div class="card-grid horizontal">
-                <div class="select-card" data-value="Minimalist and Clean" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="square"></i></span><div class="card-content"><div class="card-title">Minimalist</div><div class="card-desc">Clean, whitespace, refined</div></div></div>
-                <div class="select-card" data-value="Corporate and Professional" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="briefcase"></i></span><div class="card-content"><div class="card-title">Corporate</div><div class="card-desc">Trust, structure, clear hierarchy</div></div></div>
-                <div class="select-card" data-value="Swiss / International style with grid-heavy layout" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="grid"></i></span><div class="card-content"><div class="card-title">Swiss</div><div class="card-desc">Grid-heavy, typographic</div></div></div>
-                <div class="select-card" data-value="Flat / Material Design 3 with tonal surfaces" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="layers"></i></span><div class="card-content"><div class="card-title">Flat / Material</div><div class="card-desc">Tonal surfaces, subtle elevation</div></div></div>
-                <div class="select-card" data-value="Nordic / Scandinavian with muted tones" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="snowflake"></i></span><div class="card-content"><div class="card-title">Nordic</div><div class="card-desc">Muted tones, functional, airy</div></div></div>
-                <div class="select-card" data-value="Bento Grid layout with mixed card sizes" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="layout-grid"></i></span><div class="card-content"><div class="card-title">Bento Grid</div><div class="card-desc">Modular card proportions</div></div></div>
+    <div class="pb-studio-body">
+      <div class="view-prompt-builder pb-studio-grid" id="viewPromptBuilder">
+
+        <!-- LEFT FOCUSED SINGLE-STEP CONFIG CANVAS -->
+        <section class="pb-canvas" aria-label="Configuration canvas">
+          <div class="pb-canvas-scroll" id="pbCanvasScroll">
+            <div class="pb-compat-banner" id="pbCompatBanner" hidden role="status" aria-live="polite"></div>
+
+            <!-- STEP 1: ONE-CLICK STARTER BLUEPRINTS ONLY -->
+            <div class="step-panel active" data-step="1">
+              <div class="step-header">
+                <div>
+                  <h2 class="step-title">Start with a curated blueprint</h2>
+                  <p class="step-description">Load a complete architectural preset in one click, or build from scratch step by step.</p>
+                </div>
+                <span class="step-counter tabular-nums" id="stepCounter">01 / 07</span>
+              </div>
+
+              <div class="pb-block">
+                <div class="pb-block-head">
+                  <span class="section-label">One-Click Starter Blueprints</span>
+                  <span class="pb-block-hint">Pre-fills system, palette, layout, motion &amp; copy</span>
+                </div>
+                <div class="pb-subtabs pb-starter-tabs" id="pbStarterSourceTabs" role="tablist" aria-label="Starter blueprint source">
+                  <button type="button" class="pb-subtab active" data-starter-tab="curated" role="tab" aria-selected="true">Curated Starters</button>
+                  <button type="button" class="pb-subtab" data-starter-tab="wm-dashboards" role="tab" aria-selected="false">Watermelon Dashboards</button>
+                  <button type="button" class="pb-subtab" data-starter-tab="wm-templates" role="tab" aria-selected="false">Watermelon Templates</button>
+                </div>
+                <div class="pb-blueprints-grid" id="pbBlueprintsGrid"></div>
+              </div>
+
+              <div class="pb-scratch-divider">
+                <button type="button" class="pb-scratch-cta" id="btnPbStartFromScratch">
+                  <div class="pb-scratch-copy">
+                    <span class="pb-scratch-title">Start from scratch instead</span>
+                    <span class="pb-scratch-desc">Pick a website category and dial in palette, motion, and UI libraries yourself</span>
+                  </div>
+                  <span class="pb-scratch-arrow">Choose Category <i data-lucide="arrow-right"></i></span>
+                </button>
               </div>
             </div>
-            <div class="style-group">
-              <div class="style-group-label">Bold &amp; Editorial</div>
-              <div class="card-grid horizontal">
-                <div class="select-card" data-value="Dark and Modern" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="moon"></i></span><div class="card-content"><div class="card-title">Dark Modern</div><div class="card-desc">Dark theme, crisp contrast</div></div></div>
-                <div class="select-card" data-value="Editorial / Magazine with bold typography" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="book-open"></i></span><div class="card-content"><div class="card-title">Editorial</div><div class="card-desc">Bold headlines, structured columns</div></div></div>
-                <div class="select-card" data-value="Brutalist / Raw" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="box"></i></span><div class="card-content"><div class="card-title">Brutalist</div><div class="card-desc">Raw, sharp borders, bold</div></div></div>
-                <div class="select-card" data-value="Elegant and Luxury" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="crown"></i></span><div class="card-content"><div class="card-title">Luxury</div><div class="card-desc">Serif typography, warm accents</div></div></div>
-                <div class="select-card" data-value="Playful and Colorful" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="smile"></i></span><div class="card-content"><div class="card-title">Playful</div><div class="card-desc">Friendly, rounded shapes</div></div></div>
-                <div class="select-card" data-value="Organic and Natural" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="leaf"></i></span><div class="card-content"><div class="card-title">Organic</div><div class="card-desc">Earthy, warm, nature-inspired</div></div></div>
+
+            <!-- STEP 2: WEBSITE CATEGORIES WITH STYLIZED SVG WIREFRAME THUMBNAILS -->
+            <div class="step-panel" data-step="2">
+              <div class="step-header">
+                <div>
+                  <h2 class="step-title">Choose a website category</h2>
+                  <p class="step-description">Pick the structural archetype that best fits what you are building.</p>
+                </div>
+                <span class="step-counter tabular-nums">02 / 07</span>
+              </div>
+
+              <div class="pb-block">
+                <div class="pb-block-head pb-block-head-search">
+                  <span class="section-label">Website Archetypes</span>
+                  <div class="pb-search-wrap">
+                    <i data-lucide="search"></i>
+                    <input type="search" id="pbTypeSearch" placeholder="Filter categories…" autocomplete="off" aria-label="Filter website categories">
+                  </div>
+                </div>
+                <div id="typeGrid"></div>
+              </div>
+              <div class="validation-nudge" id="typeNudge" role="alert">Choose a website category or starter blueprint to continue.</div>
+            </div>
+
+            <!-- STEP 3: AIRY AESTHETIC, PALETTE & TYPOGRAPHY (3 CALM SUB-TABS) -->
+            <div class="step-panel" data-step="3">
+              <div class="step-header">
+                <div>
+                  <h2 class="step-title">Aesthetic, palette &amp; typography</h2>
+                  <p class="step-description">Focus on one visual decision at a time — balanced grids with zero clutter.</p>
+                </div>
+                <span class="step-counter tabular-nums">03 / 07</span>
+              </div>
+
+              <div class="pb-subtabs" data-pb-subtab-group="step3" role="tablist" aria-label="Visual direction sections">
+                <button type="button" class="pb-subtab active" data-pb-subtab="aesthetic" role="tab" aria-selected="true">Aesthetic</button>
+                <button type="button" class="pb-subtab" data-pb-subtab="palette" role="tab" aria-selected="false">Color Palette</button>
+                <button type="button" class="pb-subtab" data-pb-subtab="typography" role="tab" aria-selected="false">Typography</button>
+              </div>
+
+              <!-- Subpane 3A: Aesthetic & DESIGN.md -->
+              <div class="pb-subpane" data-pb-subpane-group="step3" data-pb-subpane="aesthetic">
+                <div class="pb-block">
+                  <div class="pb-block-head">
+                    <span class="section-label">DESIGN.md Presets</span>
+                    <span class="pb-block-hint">Syncs palette, type &amp; UI kit</span>
+                  </div>
+                  <div class="card-grid pb-grid-5" id="pbDesignMdGrid"></div>
+                </div>
+
+                <div class="pb-block" id="styleGrid">
+                  <div class="style-group">
+                    <div class="style-group-label">Clean &amp; Structured</div>
+                    <div class="card-grid pb-grid-3 pb-airy-cards">
+                      <div class="select-card" data-value="Minimalist and Clean" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="square"></i></span><div class="card-content"><div class="card-title">Minimalist</div><div class="card-desc">Airy whitespace</div></div></div>
+                      <div class="select-card" data-value="Corporate and Professional" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="briefcase"></i></span><div class="card-content"><div class="card-title">Corporate</div><div class="card-desc">Structured trust</div></div></div>
+                      <div class="select-card" data-value="Swiss / International style with grid-heavy layout" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="grid"></i></span><div class="card-content"><div class="card-title">Swiss Grid</div><div class="card-desc">Typographic rigor</div></div></div>
+                      <div class="select-card" data-value="Flat / Material Design 3 with tonal surfaces" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="layers"></i></span><div class="card-content"><div class="card-title">Tonal Flat</div><div class="card-desc">Layered surfaces</div></div></div>
+                      <div class="select-card" data-value="Nordic / Scandinavian with muted tones" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="snowflake"></i></span><div class="card-content"><div class="card-title">Nordic</div><div class="card-desc">Calm &amp; muted</div></div></div>
+                      <div class="select-card" data-value="Bento Grid layout with mixed card sizes" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="layout-grid"></i></span><div class="card-content"><div class="card-title">Bento Grid</div><div class="card-desc">Modular tiles</div></div></div>
+                    </div>
+                  </div>
+                  <div class="style-group">
+                    <div class="style-group-label">Expressive &amp; Editorial</div>
+                    <div class="card-grid pb-grid-3 pb-airy-cards">
+                      <div class="select-card" data-value="Dark and Modern" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="moon"></i></span><div class="card-content"><div class="card-title">Dark Modern</div><div class="card-desc">Obsidian contrast</div></div></div>
+                      <div class="select-card" data-value="Editorial / Magazine with bold typography" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="book-open"></i></span><div class="card-content"><div class="card-title">Editorial</div><div class="card-desc">Magazine rhythm</div></div></div>
+                      <div class="select-card" data-value="Brutalist / Raw" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="box"></i></span><div class="card-content"><div class="card-title">Brutalist</div><div class="card-desc">Sharp geometry</div></div></div>
+                      <div class="select-card" data-value="Elegant and Luxury" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="crown"></i></span><div class="card-content"><div class="card-title">Luxury</div><div class="card-desc">Refined serifs</div></div></div>
+                      <div class="select-card" data-value="Playful and Colorful" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="smile"></i></span><div class="card-content"><div class="card-title">Playful</div><div class="card-desc">Warm &amp; tactile</div></div></div>
+                      <div class="select-card" data-value="Organic and Natural" onclick="selectCard(this,'style')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="leaf"></i></span><div class="card-content"><div class="card-title">Organic</div><div class="card-desc">Earthy tones</div></div></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Subpane 3B: Color Palettes -->
+              <div class="pb-subpane" data-pb-subpane-group="step3" data-pb-subpane="palette" hidden>
+                <div class="pb-block" id="colorGrid">
+                  <div class="pb-block-head">
+                    <span class="section-label">Curated Palettes</span>
+                    <span class="pb-block-hint">Updates 3D preview live</span>
+                  </div>
+                  <div class="card-grid pb-grid-2" id="pbPaletteCardsGrid"></div>
+                </div>
+
+                <details class="pb-disclosure custom-color-section">
+                  <summary class="pb-disclosure-summary">
+                    <span>Custom Brand Swatches</span>
+                    <span class="pb-block-hint">Override exact hex tokens</span>
+                  </summary>
+                  <div class="pb-disclosure-body">
+                    <div class="pb-block-head" style="margin-bottom:10px">
+                      <span class="pb-block-hint">Pick custom hex values and apply</span>
+                      <button type="button" class="pb-inline-btn" onclick="applyCustomColors()"><i data-lucide="palette"></i> Apply Custom Palette</button>
+                    </div>
+                    <div class="custom-color-row">
+                      <div class="color-input-wrap"><label>Primary</label><div class="color-input-field"><input type="color" id="customColor1" value="#F59E0B"><input type="text" id="customColor1Text" value="#F59E0B" maxlength="7" oninput="syncColor(this,'customColor1')"></div></div>
+                      <div class="color-input-wrap"><label>Accent</label><div class="color-input-field"><input type="color" id="customColor2" value="#38BDF8"><input type="text" id="customColor2Text" value="#38BDF8" maxlength="7" oninput="syncColor(this,'customColor2')"></div></div>
+                      <div class="color-input-wrap"><label>Background</label><div class="color-input-field"><input type="color" id="customColor3" value="#0B0B0D"><input type="text" id="customColor3Text" value="#0B0B0D" maxlength="7" oninput="syncColor(this,'customColor3')"></div></div>
+                      <div class="color-input-wrap"><label>Text</label><div class="color-input-field"><input type="color" id="customColor4" value="#FAF8F5"><input type="text" id="customColor4Text" value="#FAF8F5" maxlength="7" oninput="syncColor(this,'customColor4')"></div></div>
+                      <div class="color-input-wrap"><label>Surface</label><div class="color-input-field"><input type="color" id="customColor5" value="#151418"><input type="text" id="customColor5Text" value="#151418" maxlength="7" oninput="syncColor(this,'customColor5')"></div></div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+
+              <!-- Subpane 3C: Typography -->
+              <div class="pb-subpane" data-pb-subpane-group="step3" data-pb-subpane="typography" hidden>
+                <div class="pb-block">
+                  <div class="pb-block-head">
+                    <span class="section-label">Typography Pairings</span>
+                    <span class="pb-block-hint">Live display font preview</span>
+                  </div>
+                  <div class="card-grid pb-grid-2" id="pbFontGrid"></div>
+                  <div class="input-group" style="margin-top:16px">
+                    <label for="fontPref">Custom Font Override (optional)</label>
+                    <input type="text" id="fontPref" placeholder="e.g. Fraunces for display headings, Plus Jakarta Sans for body">
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        <div class="step-panel" data-step="3">
-          <div class="step-header"><h2 class="step-title">Choose a color scheme</h2><span class="step-counter">Step 3 of 7</span></div>
-          <p class="step-description">Pick a curated palette or configure custom brand colors.</p>
-          <div id="colorGrid">
-            <div class="style-group">
-              <div class="style-group-label">Clean &amp; Contrast Palettes</div>
-              <div class="card-grid wide">
-                <div class="select-card color-card" data-palette="classic-blue" data-value="Cobalt Blue (#2563EB) primary with white (#ffffff) surface" onclick="selectCard(this,'color')"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#ffffff"></span><span style="background:#2563EB"></span><span style="background:#1E293B"></span><span style="background:#F1F5F9"></span></div><div class="card-title-row"><div class="card-title">Cobalt Blue</div><div class="color-rec">Suggested</div></div></div>
-                <div class="select-card color-card" data-palette="forest-green" data-value="Emerald (#10B981) and Forest (#064E3B) with crisp light surface" onclick="selectCard(this,'color')"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#F0FDF4"></span><span style="background:#10B981"></span><span style="background:#064E3B"></span><span style="background:#ffffff"></span></div><div class="card-title-row"><div class="card-title">Forest Green</div><div class="color-rec">Suggested</div></div></div>
-                <div class="select-card color-card" data-palette="monochrome" data-value="Slate (#64748B) and Ink (#171717) with white background" onclick="selectCard(this,'color')"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#ffffff"></span><span style="background:#171717"></span><span style="background:#64748B"></span><span style="background:#F8FAFC"></span></div><div class="card-title-row"><div class="card-title">Monochrome</div><div class="color-rec">Suggested</div></div></div>
-                <div class="select-card color-card" data-palette="nordic-slate" data-value="Nordic slate (#F0F5F9) background, steel (#C9D6DF), and charcoal (#1E2022)" onclick="selectCard(this,'color')"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#F0F5F9"></span><span style="background:#C9D6DF"></span><span style="background:#52616B"></span><span style="background:#1E2022"></span></div><div class="card-title-row"><div class="card-title">Nordic Slate</div><div class="color-rec">Suggested</div></div></div>
-                <div class="select-card color-card" data-palette="charcoal-gold" data-value="Charcoal (#333333) with Gold (#d4a843) accents on warm paper" onclick="selectCard(this,'color')"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#ffffff"></span><span style="background:#333333"></span><span style="background:#d4a843"></span><span style="background:#F5F0E8"></span></div><div class="card-title-row"><div class="card-title">Charcoal &amp; Gold</div><div class="color-rec">Suggested</div></div></div>
-                <div class="select-card color-card" data-palette="deep-ocean" data-value="Deep slate (#0f1419) dark mode with Cobalt/Teal (#4a9a8e) accents" onclick="selectCard(this,'color')"><span class="check-mark"><i data-lucide="check"></i></span><div class="color-swatches"><span style="background:#0f1419"></span><span style="background:#192028"></span><span style="background:#4a9a8e"></span><span style="background:#a8b2c1"></span></div><div class="card-title-row"><div class="card-title">Deep Ocean</div><div class="color-rec">Suggested</div></div></div>
+            <!-- STEP 4: AIRY LAYOUT STRUCTURE & MULTI-SELECT MOTION STUDIO (2 SUB-TABS) -->
+            <div class="step-panel" data-step="4">
+              <div class="step-header">
+                <div>
+                  <h2 class="step-title">Layout &amp; motion</h2>
+                  <p class="step-description">Define page geometry first, then combine one or more live motion styles.</p>
+                </div>
+                <span class="step-counter tabular-nums">04 / 07</span>
+              </div>
+
+              <div class="pb-subtabs" data-pb-subtab-group="step4" role="tablist" aria-label="Layout and motion sections">
+                <button type="button" class="pb-subtab active" data-pb-subtab="layout" role="tab" aria-selected="true">Layout Structure</button>
+                <button type="button" class="pb-subtab" data-pb-subtab="motion" role="tab" aria-selected="false">Motion &amp; Feel</button>
+              </div>
+
+              <!-- Subpane 4A: Layout Structure -->
+              <div class="pb-subpane" data-pb-subpane-group="step4" data-pb-subpane="layout">
+                <div class="pb-block">
+                  <label class="section-label">Navigation</label>
+                  <div class="card-grid pb-grid-3" id="headerGrid">
+                    <div class="select-card" data-value="Fixed top navigation bar" onclick="selectCard(this,'header')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Top Navbar</div><div class="card-desc">Sticky top bar</div></div>
+                    <div class="select-card" data-value="Left sidebar navigation" onclick="selectCard(this,'header')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Sidebar Rail</div><div class="card-desc">Vertical app nav</div></div>
+                    <div class="select-card" data-value="Centered logo with navigation below" onclick="selectCard(this,'header')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Centered Masthead</div><div class="card-desc">Editorial stack</div></div>
+                    <div class="select-card" data-value="Floating translucent top dock navigation bar" onclick="selectCard(this,'header')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Floating Dock</div><div class="card-desc">Frosted glass bar</div></div>
+                    <div class="select-card" data-value="Split utility header with brand, command search, and action CTA" onclick="selectCard(this,'header')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Command Header</div><div class="card-desc">Search + quick CTA</div></div>
+                    <div class="select-card" data-value="Hamburger menu only (hidden nav)" onclick="selectCard(this,'header')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Minimal Drawer</div><div class="card-desc">Quiet corner menu</div></div>
+                  </div>
+                </div>
+
+                <div class="pb-block">
+                  <label class="section-label">Hero Architecture</label>
+                  <div class="card-grid pb-grid-3" id="heroGrid">
+                    <div class="select-card" data-value="Full-screen hero with centered headline" onclick="selectCard(this,'hero')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Centered Hero</div><div class="card-desc">Headline + focal CTA</div></div>
+                    <div class="select-card" data-value="Split hero with text on left and visual on right" onclick="selectCard(this,'hero')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Split Visual</div><div class="card-desc">Copy left, media right</div></div>
+                    <div class="select-card" data-value="Minimal text-only hero with bold typography" onclick="selectCard(this,'hero')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Editorial Type</div><div class="card-desc">Display-led opening</div></div>
+                    <div class="select-card" data-value="Asymmetric Bento hero with headline and live metric tiles" onclick="selectCard(this,'hero')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Asymmetric Bento</div><div class="card-desc">Copy + metric tiles</div></div>
+                    <div class="select-card" data-value="Interactive product showcase hero with framed UI preview below headline" onclick="selectCard(this,'hero')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Product Frame</div><div class="card-desc">Headline + app window</div></div>
+                    <div class="select-card" data-value="Full-bleed visual showcase hero with crisp bottom overlay" onclick="selectCard(this,'hero')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Full-Bleed Media</div><div class="card-desc">Edge-to-edge canvas</div></div>
+                  </div>
+                </div>
+
+                <div class="pb-block">
+                  <label class="section-label">Content Rhythm</label>
+                  <div class="card-grid pb-grid-3" id="contentGrid">
+                    <div class="select-card" data-value="Card-based grid layout" onclick="selectCard(this,'content')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Bento / Cards</div><div class="card-desc">Modular grid</div></div>
+                    <div class="select-card" data-value="Alternating left-right feature sections" onclick="selectCard(this,'content')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Alternating Rows</div><div class="card-desc">Split narratives</div></div>
+                    <div class="select-card" data-value="Data-dense tabbed dashboard workspace" onclick="selectCard(this,'content')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Dashboard</div><div class="card-desc">KPIs &amp; tables</div></div>
+                    <div class="select-card" data-value="Masonry staggered visual gallery layout" onclick="selectCard(this,'content')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Masonry Gallery</div><div class="card-desc">Staggered mosaic</div></div>
+                    <div class="select-card" data-value="Sticky sidebar index with structured documentation columns" onclick="selectCard(this,'content')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Sticky Docs</div><div class="card-desc">Index + prose</div></div>
+                    <div class="select-card" data-value="Editorial broadsheet multi-column grid with hairline rules" onclick="selectCard(this,'content')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Broadsheet</div><div class="card-desc">Swiss columns</div></div>
+                  </div>
+                </div>
+
+                <div class="pb-block">
+                  <div class="pb-block-head">
+                    <span class="section-label">Secondary Layout (Optional)</span>
+                    <span class="pb-block-hint">Pair a secondary rhythm for detail sections</span>
+                  </div>
+                  <div class="pb-inline-seg-row" id="pbSecondaryLayoutGrid"></div>
+                </div>
+
+                <div class="pb-block pb-two-col">
+                  <div>
+                    <label class="section-label">Spacing Density</label>
+                    <div class="card-grid pb-grid-3" id="spacingGrid">
+                      <div class="select-card" data-value="Compact high-density workspace (tight 16-24px rhythm)" onclick="selectCard(this,'spacing')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Compact</div><div class="card-desc">Tight workspace</div></div>
+                      <div class="select-card" data-value="Balanced modern spacing (80-96px section rhythm)" onclick="selectCard(this,'spacing')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Balanced</div><div class="card-desc">Modern cadence</div></div>
+                      <div class="select-card" data-value="Generous editorial breathing room (120px+ whitespace)" onclick="selectCard(this,'spacing')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Airy</div><div class="card-desc">Generous space</div></div>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="section-label">Footer</label>
+                    <div class="card-grid pb-grid-2" id="footerGrid">
+                      <div class="select-card" data-value="Minimal single-line footer" onclick="selectCard(this,'footer')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Minimal</div><div class="card-desc">Quiet bar</div></div>
+                      <div class="select-card" data-value="Multi-column footer with navigation and contact" onclick="selectCard(this,'footer')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Multi-Column</div><div class="card-desc">Directory</div></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Subpane 4B: Multi-Select Motion & Micro-Interactions -->
+              <div class="pb-subpane" data-pb-subpane-group="step4" data-pb-subpane="motion" hidden>
+                <div class="pb-block">
+                  <div class="pb-block-head">
+                    <span class="section-label">Motion Library</span>
+                    <span class="pb-block-hint">Choose zero-dep CSS or Framer Motion</span>
+                  </div>
+                  <div class="pb-inline-seg-grid" id="pbMotionLibrarySeg"></div>
+                </div>
+
+                <div class="pb-block">
+                  <div class="pb-block-head">
+                    <span class="section-label">Motion Profiles</span>
+                    <span class="pb-block-hint tabular-nums" id="pbMotionCountHint">Compatible combinations only · conflicts auto-resolved</span>
+                  </div>
+                  <div class="card-grid pb-motion-grid pb-grid-3" id="pbMotionGrid"></div>
+                </div>
+
+                <div class="pb-block">
+                  <label class="section-label">Micro-Interaction Style</label>
+                  <div class="card-grid pb-grid-2" id="pbInteractionGrid"></div>
+                </div>
               </div>
             </div>
-          </div>
-          <div class="custom-color-section">
-            <label class="section-label">Custom Brand Colors</label>
-            <div class="custom-color-row">
-              <div class="color-input-wrap"><label>Primary</label><div class="color-input-field"><input type="color" id="customColor1" value="#2563EB"><input type="text" id="customColor1Text" value="#2563EB" maxlength="7" oninput="syncColor(this,'customColor1')"></div></div>
-              <div class="color-input-wrap"><label>Accent</label><div class="color-input-field"><input type="color" id="customColor2" value="#0EA5E9"><input type="text" id="customColor2Text" value="#0EA5E9" maxlength="7" oninput="syncColor(this,'customColor2')"></div></div>
-              <div class="color-input-wrap"><label>Background</label><div class="color-input-field"><input type="color" id="customColor3" value="#ffffff"><input type="text" id="customColor3Text" value="#ffffff" maxlength="7" oninput="syncColor(this,'customColor3')"></div></div>
-              <div class="color-input-wrap"><label>Text</label><div class="color-input-field"><input type="color" id="customColor4" value="#111827"><input type="text" id="customColor4Text" value="#111827" maxlength="7" oninput="syncColor(this,'customColor4')"></div></div>
-              <div class="color-input-wrap"><label>Secondary</label><div class="color-input-field"><input type="color" id="customColor5" value="#F1F5F9"><input type="text" id="customColor5Text" value="#F1F5F9" maxlength="7" oninput="syncColor(this,'customColor5')"></div></div>
-            </div>
-            <button type="button" class="btn btn-outline" style="margin:12px auto 0;display:flex" onclick="applyCustomColors()"><i data-lucide="palette"></i> Apply Custom Colors</button>
-          </div>
-        </div>
 
-        <div class="step-panel" data-step="4">
-          <div class="step-header"><h2 class="step-title">Layout preferences</h2><span class="step-counter">Step 4 of 7</span></div>
-          <p class="step-description">Choose how key sections of your website should be structured.</p>
-          <div style="margin-bottom:24px"><label class="section-label">Header / Navigation Style</label><div class="card-grid compact" id="headerGrid">
-            <div class="select-card" data-value="Fixed top navigation bar" onclick="selectCard(this,'header')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Top Navbar</div><div class="card-desc">Classic fixed header</div></div>
-            <div class="select-card" data-value="Left sidebar navigation" onclick="selectCard(this,'header')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Sidebar</div><div class="card-desc">Vertical left-side nav</div></div>
-            <div class="select-card" data-value="Centered logo with navigation below" onclick="selectCard(this,'header')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Centered</div><div class="card-desc">Logo center, links below</div></div>
-            <div class="select-card" data-value="Hamburger menu only (hidden nav)" onclick="selectCard(this,'header')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Hamburger</div><div class="card-desc">Collapsible mobile/desktop drawer</div></div>
-          </div></div>
-          <div style="margin-bottom:24px"><label class="section-label">Hero Section Style</label><div class="card-grid compact" id="heroGrid">
-            <div class="select-card" data-value="Full-screen hero with centered headline" onclick="selectCard(this,'hero')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Centered Hero</div><div class="card-desc">Headline + primary CTA</div></div>
-            <div class="select-card" data-value="Split hero with text on left and visual on right" onclick="selectCard(this,'hero')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Split Layout</div><div class="card-desc">Copy left, visual right</div></div>
-            <div class="select-card" data-value="Minimal text-only hero with bold typography" onclick="selectCard(this,'hero')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Editorial Type</div><div class="card-desc">Typography-led focal point</div></div>
-          </div></div>
-          <div style="margin-bottom:24px"><label class="section-label">Content Layout</label><div class="card-grid compact" id="contentGrid">
-            <div class="select-card" data-value="Card-based grid layout" onclick="selectCard(this,'content')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Card Grid</div><div class="card-desc">Structured modular grid</div></div>
-            <div class="select-card" data-value="Alternating left-right feature sections" onclick="selectCard(this,'content')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Alternating</div><div class="card-desc">Two-column alternating rows</div></div>
-            <div class="select-card" data-value="Data-dense tabbed dashboard workspace" onclick="selectCard(this,'content')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Dashboard</div><div class="card-desc">KPIs, tables, and filters</div></div>
-          </div></div>
-          <div><label class="section-label">Footer Style</label><div class="card-grid compact" id="footerGrid">
-            <div class="select-card" data-value="Minimal single-line footer" onclick="selectCard(this,'footer')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Minimal</div><div class="card-desc">Copyright and quiet links</div></div>
-            <div class="select-card" data-value="Multi-column footer with navigation and contact" onclick="selectCard(this,'footer')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Multi-Column</div><div class="card-desc">Grouped site directory</div></div>
-          </div></div>
-        </div>
+            <!-- STEP 5: DEDICATED COMPONENTS & AI FREEDOM (ZERO DISTRACTIONS) -->
+            <div class="step-panel" data-step="5">
+              <div class="step-header">
+                <div>
+                  <h2 class="step-title">Components &amp; AI freedom</h2>
+                  <p class="step-description">Control how strictly local or cloud models follow UI templates, or mix &amp; match live elements across libraries.</p>
+                </div>
+                <span class="step-counter tabular-nums">05 / 07</span>
+              </div>
 
-        <div class="step-panel" data-step="5">
-          <div class="step-header"><h2 class="step-title">Content details</h2><span class="step-counter">Step 5 of 7</span></div>
-          <p class="step-description">Tell us about your website's content and voice. All fields are optional.</p>
-          <div class="input-row">
-            <div class="input-group"><label for="siteName">Website / Brand Name</label><input type="text" id="siteName" placeholder="e.g. Northstar Analytics"></div>
-            <div class="input-group"><label for="siteTagline">Tagline / Headline</label><input type="text" id="siteTagline" placeholder="e.g. Fast local telemetry for modern teams"></div>
-          </div>
-          <div class="input-group"><label for="siteDescription">Brief Description</label><textarea id="siteDescription" placeholder="Describe core purpose, users, and key workflows..."></textarea></div>
-          <div style="margin-bottom:24px"><label class="section-label">Tone / Voice</label><div class="card-grid compact" id="toneGrid">
-            <div class="select-card" data-value="Professional and clear" onclick="selectCard(this,'siteTone')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Professional</div><div class="card-desc">Clear and trustworthy</div></div>
-            <div class="select-card" data-value="Warm and approachable" onclick="selectCard(this,'siteTone')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Approachable</div><div class="card-desc">Friendly and direct</div></div>
-            <div class="select-card" data-value="Editorial and refined" onclick="selectCard(this,'siteTone')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Refined</div><div class="card-desc">Thoughtful and calm</div></div>
-            <div class="select-card" data-value="Technical and concise" onclick="selectCard(this,'siteTone')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Technical</div><div class="card-desc">Developer-focused</div></div>
-          </div></div>
-          <div class="input-group"><label for="customSections">Specific Sections to Include (optional)</label><input type="text" id="customSections" placeholder="e.g. Pricing Matrix, Interactive Demo, FAQ, Contact Form"></div>
-        </div>
+              <!-- 4-Level AI Freedom Slider -->
+              <div class="pb-block">
+                <div class="pb-block-head">
+                  <span class="section-label">AI Model Creative Freedom</span>
+                  <span class="pb-block-hint">Tuned for 9B–12B local LLMs &amp; frontier models</span>
+                </div>
+                <div class="pb-freedom-panel" id="pbFreedomControl"></div>
+              </div>
 
-        <div class="step-panel" data-step="6">
-          <div class="step-header"><h2 class="step-title">Features &amp; tech stack</h2><span class="step-counter">Step 6 of 7</span></div>
-          <p class="step-description">Select interactive features and technology preferences.</p>
-          <div style="margin-bottom:24px"><label class="section-label">Interactive Features</label>
-            <div class="feature-grid" id="featureGrid">
-              <div class="feature-card" data-value="Responsive hamburger mobile menu" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Mobile Menu</span></div>
-              <div class="feature-card" data-value="Dark / Light mode toggle" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Dark/Light Toggle</span></div>
-              <div class="feature-card" data-value="Smooth scroll navigation" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Smooth Scroll</span></div>
-              <div class="feature-card" data-value="Contact form with validation" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Contact Form</span></div>
-              <div class="feature-card" data-value="Pricing table section" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Pricing Table</span></div>
-              <div class="feature-card" data-value="FAQ accordion section" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">FAQ Accordion</span></div>
-              <div class="feature-card" data-value="Interactive data filter / search" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Search &amp; Filters</span></div>
-              <div class="feature-card" data-value="Newsletter subscription form" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Newsletter Form</span></div>
-            </div>
-          </div>
-          <div style="margin-bottom:24px"><label class="section-label">Technology Stack</label><div class="card-grid" id="techGrid">
-            <div class="select-card" data-value="React with Tailwind CSS and Lucide React" onclick="selectCard(this,'tech')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="atom"></i></span><div class="card-content"><div class="card-title">React + Tailwind</div><div class="card-desc">Recommended for WebForge</div></div></div>
-            <div class="select-card" data-value="Pure HTML, CSS, and vanilla JavaScript" onclick="selectCard(this,'tech')"><span class="check-mark"><i data-lucide="check"></i></span><span class="card-icon"><i data-lucide="code-2"></i></span><div class="card-content"><div class="card-title">HTML / CSS / JS</div><div class="card-desc">Zero-framework static bundle</div></div></div>
-          </div></div>
-          <div style="margin-bottom:24px"><label class="section-label">Code Preferences</label><div class="feature-grid" id="techFeatureGrid">
-            <div class="feature-card" data-value="Use semantic HTML5 elements" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Semantic HTML5</span></div>
-            <div class="feature-card" data-value="Ensure WCAG AA accessibility standards" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">WCAG Accessibility</span></div>
-            <div class="feature-card" data-value="Include Google Fonts" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Google Fonts</span></div>
-            <div class="feature-card" data-value="Use CSS custom properties" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">CSS Variables</span></div>
-          </div></div>
-          <div class="input-group"><label for="fontPref">Font Preferences (optional)</label><input type="text" id="fontPref" placeholder="e.g. Plus Jakarta Sans for headings, DM Sans for body text"></div>
-        </div>
+              <!-- Component Source Mode: Whole Library vs Mix & Match 10 Slots -->
+              <div class="pb-block">
+                <div class="pb-block-head pb-block-head-search">
+                  <span class="section-label">UI Component Source</span>
+                  <div class="pb-mode-seg" role="tablist" aria-label="Component selection mode">
+                    <button type="button" class="pb-mode-btn active" data-pb-comp-mode="library" role="tab" aria-selected="true">Whole Library</button>
+                    <button type="button" class="pb-mode-btn" data-pb-comp-mode="mix-match" role="tab" aria-selected="false">Mix &amp; Match (10 Slots)</button>
+                  </div>
+                </div>
 
-        <div class="step-panel" data-step="7">
-          <div class="step-header"><h2 class="step-title">Your AI prompt is ready</h2><span class="step-counter">Step 7 of 7</span></div>
-          <p class="step-description">Review, tweak, or launch directly into the studio builder.</p>
-          <div class="prompt-output-container">
-            <div class="prompt-output-header">
-              <div class="prompt-output-title"><i data-lucide="file-text"></i> Generated Prompt</div>
-              <div class="prompt-output-actions">
-                <button type="button" class="btn-sm" onclick="copyPrompt()" id="copyBtn"><i data-lucide="copy"></i> Copy</button>
-                <button type="button" class="btn-sm" onclick="downloadPrompt()"><i data-lucide="download"></i> Download .txt</button>
+                <div class="pb-pure-system-notice" id="pbPureSystemNotice" hidden>
+                  <i data-lucide="sparkles"></i>
+                  <span><strong>Level 4 Pure Design System active</strong> — Template UI components are bypassed. The model builds bespoke sections from your palette, typography, layout, and motion tokens alone.</span>
+                </div>
+
+                <div class="pb-l1-warning-notice" id="pbL1NoSourceNotice" hidden role="status">
+                  <div class="pb-l1-notice-copy">
+                    <i data-lucide="alert-triangle"></i>
+                    <span><strong>L1 Strict has no component source attached</strong> — Without verbatim Mix &amp; Match slot code, the prompt auto-downgrades L1 to a style reference so the model never hallucinates library code.</span>
+                  </div>
+                  <button type="button" class="pb-compat-fix-btn" id="btnPbOpenMixMatchFromNotice">Open Mix &amp; Match</button>
+                </div>
+
+                <div id="pbComponentSourceWrap" class="pb-component-source-wrap">
+                  <!-- Whole Library Preset Pane -->
+                  <div id="pbWholeLibraryPane">
+                    <div class="pb-sync-grid" id="pbUiLibGrid"></div>
+                  </div>
+
+                  <!-- 10-Slot Mix & Match Pane (Core 6 + Benchmark, Pricing, Proof, FAQ) -->
+                  <div id="pbMixMatchPane" hidden>
+                    <p class="pb-mix-intro">Click any of the 10 section slots (Navbar, Hero, Features, Cards, Benchmark, Pricing, Proof, FAQ, CTA, Footer) to pick live components across libraries and embed verbatim source code.</p>
+                    <div class="pb-mix-slots-grid" id="pbMixSlotsGrid"></div>
+                    <div class="pb-slot-picker-panel" id="pbSlotPickerPanel" hidden></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Output Format & Target Model Delivery -->
+              <div class="pb-block pb-two-col">
+                <div>
+                  <div class="pb-block-head">
+                    <span class="section-label">Output Format</span>
+                  </div>
+                  <div class="pb-inline-seg-grid" id="pbOutputFormatSeg"></div>
+                </div>
+                <div>
+                  <div class="pb-block-head">
+                    <span class="section-label">Target Model Delivery</span>
+                  </div>
+                  <div class="pb-inline-seg-grid" id="pbDeliveryModeSeg"></div>
+                </div>
               </div>
             </div>
-            <div class="prompt-text" id="promptOutput" contenteditable="true"></div>
-            <div class="prompt-resize-bar" id="resizeBar">
-              <div class="resize-grip"><span></span><span></span></div>
-              <div class="resize-btns" onclick="event.stopPropagation()">
-                <button type="button" class="resize-btn resize-btn-min" onclick="setPromptHeight('min')" title="Compact"><div class="resize-btn-inner"></div></button>
-                <button type="button" class="resize-btn resize-btn-mid active" onclick="setPromptHeight('mid')" title="Default"><div class="resize-btn-inner"></div></button>
-                <button type="button" class="resize-btn resize-btn-max" onclick="setPromptHeight('max')" title="Expanded"><div class="resize-btn-inner"></div></button>
+
+            <!-- STEP 6: BRAND, INTERACTIVE FEATURES, STACK & AI SKILLS (2 CLEAN SUB-TABS) -->
+            <div class="step-panel" data-step="6">
+              <div class="step-header">
+                <div>
+                  <h2 class="step-title">Brand, features &amp; skills</h2>
+                  <p class="step-description">Add real product copy, toggle interactive features, and choose stack &amp; agent skills.</p>
+                </div>
+                <span class="step-counter tabular-nums">06 / 07</span>
+              </div>
+
+              <div class="pb-subtabs" data-pb-subtab-group="step6" role="tablist" aria-label="Brand and technical options">
+                <button type="button" class="pb-subtab active" data-pb-subtab="brand" role="tab" aria-selected="true">Brand &amp; Features</button>
+                <button type="button" class="pb-subtab" data-pb-subtab="stack" role="tab" aria-selected="false">Audience, Stack &amp; Skills</button>
+              </div>
+
+              <!-- Subpane 6A: Brand Copy & Interactive Features -->
+              <div class="pb-subpane" data-pb-subpane-group="step6" data-pb-subpane="brand">
+                <div class="pb-block">
+                  <div class="input-row">
+                    <div class="input-group"><label for="siteName">Brand / Product Name</label><input type="text" id="siteName" placeholder="e.g. Northstar Telemetry"></div>
+                    <div class="input-group"><label for="siteTagline">Hero Headline / Tagline</label><input type="text" id="siteTagline" placeholder="e.g. Fast local observability for modern teams"></div>
+                  </div>
+                  <div class="input-group"><label for="siteDescription">Product Brief</label><textarea id="siteDescription" placeholder="Describe core purpose, unique value, and key user flows..."></textarea></div>
+                </div>
+
+                <div class="pb-block">
+                  <div class="pb-block-head">
+                    <span class="section-label">Sections &amp; Interactive Features</span>
+                    <span class="pb-block-hint">Tick any item to configure seed data, tiers, or behavior inline</span>
+                  </div>
+                  <div class="pb-unified-sections-list" id="pbUnifiedSectionsGrid"></div>
+                </div>
+
+                <div class="input-group">
+                  <label for="customSections">Additional Custom Sections (optional)</label>
+                  <input type="text" id="customSections" placeholder="e.g. Live Webhook Playground, Regional Status Map, Changelog">
+                </div>
+
+                <div class="input-group">
+                  <label for="doNotList">Do Not Include (exclusions &amp; guardrails)</label>
+                  <textarea id="doNotList" rows="2" placeholder="Gradient blobs, emoji, stock illustrations, lorem ipsum, invented customer logos..."></textarea>
+                </div>
+              </div>
+
+              <!-- Subpane 6B: Audience, Scope, Stack & AI Skills -->
+              <div class="pb-subpane" data-pb-subpane-group="step6" data-pb-subpane="stack" hidden>
+                <div class="pb-block">
+                  <label class="section-label">Target Audience</label>
+                  <div class="card-grid pb-grid-3" id="pbAudienceGrid"></div>
+                </div>
+
+                <div class="pb-block pb-two-col">
+                  <div>
+                    <label class="section-label">Page Scope</label>
+                    <div class="card-grid pb-grid-2" id="pbScopeGrid"></div>
+                  </div>
+                  <div>
+                    <label class="section-label">Tone &amp; Voice</label>
+                    <div class="card-grid pb-grid-2" id="toneGrid">
+                      <div class="select-card" data-value="Professional and clear" onclick="selectCard(this,'siteTone')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Professional</div><div class="card-desc">Clear &amp; trusted</div></div>
+                      <div class="select-card" data-value="Warm and approachable" onclick="selectCard(this,'siteTone')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Approachable</div><div class="card-desc">Friendly &amp; direct</div></div>
+                      <div class="select-card" data-value="Editorial and refined" onclick="selectCard(this,'siteTone')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Refined</div><div class="card-desc">Thoughtful &amp; calm</div></div>
+                      <div class="select-card" data-value="Technical and concise" onclick="selectCard(this,'siteTone')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">Technical</div><div class="card-desc">Developer-first</div></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pb-block pb-two-col">
+                  <div>
+                    <label class="section-label">Technology Stack</label>
+                    <div class="card-grid pb-grid-2" id="techGrid">
+                      <div class="select-card" data-value="React with Tailwind CSS and Lucide React" onclick="selectCard(this,'tech')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">React + Tailwind</div><div class="card-desc">Recommended</div></div>
+                      <div class="select-card" data-value="Pure HTML, CSS, and vanilla JavaScript" onclick="selectCard(this,'tech')"><span class="check-mark"><i data-lucide="check"></i></span><div class="card-title">HTML / CSS / JS</div><div class="card-desc">Zero-framework</div></div>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="section-label">Code Standards</label>
+                    <div class="feature-grid pb-grid-2" id="techFeatureGrid">
+                      <div class="feature-card" data-value="Use semantic HTML5 elements" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Semantic HTML5</span></div>
+                      <div class="feature-card" data-value="Ensure WCAG AA accessibility standards" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">WCAG AA Access</span></div>
+                      <div class="feature-card" data-value="Include Google Fonts" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">Google Fonts</span></div>
+                      <div class="feature-card" data-value="Use CSS custom properties" onclick="toggleFeature(this)"><span class="feature-toggle"><i data-lucide="check"></i></span><span class="feature-label">CSS Variables</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pb-block">
+                  <div class="pb-block-head">
+                    <span class="section-label">Optional AI Agent Skills</span>
+                    <span class="pb-block-hint">Opt-in per prompt · none included unless selected</span>
+                  </div>
+                  <div class="feature-grid pb-skills-grid" id="pbSkillsGrid"></div>
+                </div>
               </div>
             </div>
-            <div class="edit-hint">Click above to edit your prompt before building.</div>
-            <div class="quality-score">
-              <span class="quality-label">Prompt Completeness</span>
-              <div class="quality-bar"><div class="quality-fill" id="qualityFill"></div></div>
-              <span class="quality-percent tabular-nums" id="qualityPercent">0%</span>
-            </div>
-          </div>
-          <div class="output-footer">
-            <div class="output-tip">Want to adjust? <a href="#" onclick="goToStep(1); return false;">Edit selections</a></div>
-            <div class="output-footer-actions">
-              <button type="button" class="btn btn-outline" onclick="startOver()"><i data-lucide="rotate-ccw"></i> Start Over</button>
-              <button type="button" class="btn btn-outline" onclick="prevStep()"><i data-lucide="arrow-left"></i> Back</button>
-              <button type="button" class="btn btn-primary" id="btnContinuePrompt" onclick="continueToChat()">Build Project <i data-lucide="arrow-right"></i></button>
-            </div>
-          </div>
-        </div>
 
-        <footer id="wizardFooter" class="wizard-footer">
-          <div class="wizard-footer-left">
-            <button type="button" class="btn btn-outline" id="wizardBackBtn" hidden onclick="prevStep()">
-              <i data-lucide="arrow-left"></i> Back
-            </button>
-            <button type="button" class="btn btn-skip" id="wizardSkipBtn" hidden onclick="nextStep()">Skip</button>
+            <!-- STEP 7: COMPILED BUILD BRIEF & LAUNCH -->
+            <div class="step-panel" data-step="7">
+              <div class="step-header">
+                <div>
+                  <h2 class="step-title">Your build brief is ready</h2>
+                  <p class="step-description">Fine-tune inline, save as a reusable template, or launch directly into WebForge Studio.</p>
+                </div>
+                <span class="step-counter tabular-nums">07 / 07</span>
+              </div>
+
+              <div class="prompt-output-container">
+                <div class="prompt-output-header">
+                  <div class="prompt-output-title"><i data-lucide="file-text"></i> Compiled Build Specification</div>
+                  <div class="prompt-output-actions">
+                    <button type="button" class="btn-sm" id="btnPbOpenSaveTemplate"><i data-lucide="bookmark-plus"></i> Save Template</button>
+                    <button type="button" class="btn-sm" onclick="copyPrompt()" id="copyBtn"><i data-lucide="copy"></i> Copy</button>
+                    <button type="button" class="btn-sm" onclick="downloadPrompt()"><i data-lucide="download"></i> .txt</button>
+                  </div>
+                </div>
+
+                <div class="pb-save-template-row" id="pbSaveTemplateRow" hidden>
+                  <input type="text" id="pbTemplateNameInput" placeholder="Name this template (e.g. Dark SaaS Launchpad)…" maxlength="60" autocomplete="off">
+                  <button type="button" class="btn btn-primary btn-sm" id="btnPbConfirmSaveTemplate"><i data-lucide="check"></i> Save</button>
+                  <button type="button" class="btn btn-outline btn-sm" id="btnPbCancelSaveTemplate">Cancel</button>
+                </div>
+
+                <div class="prompt-text" id="promptOutput" contenteditable="true" spellcheck="false"></div>
+
+                <div class="prompt-resize-bar" id="resizeBar">
+                  <div class="resize-grip"><span></span><span></span></div>
+                  <div class="resize-btns" onclick="event.stopPropagation()">
+                    <button type="button" class="resize-btn resize-btn-min" onclick="setPromptHeight('min')" title="Compact"><div class="resize-btn-inner"></div></button>
+                    <button type="button" class="resize-btn resize-btn-mid active" onclick="setPromptHeight('mid')" title="Default"><div class="resize-btn-inner"></div></button>
+                    <button type="button" class="resize-btn resize-btn-max" onclick="setPromptHeight('max')" title="Expanded"><div class="resize-btn-inner"></div></button>
+                  </div>
+                </div>
+
+                <div class="quality-score">
+                  <span class="quality-label">Specification Depth</span>
+                  <div class="quality-bar"><div class="quality-fill" id="qualityFill"></div></div>
+                  <span class="quality-percent tabular-nums" id="qualityPercent">0%</span>
+                </div>
+              </div>
+
+              <div class="output-footer">
+                <div class="output-tip">Click anywhere in the brief above to edit before building.</div>
+                <div class="output-footer-actions">
+                  <button type="button" class="btn btn-outline" onclick="prevStep()"><i data-lucide="arrow-left"></i> Back</button>
+                  <button type="button" class="btn btn-primary pb-launch-btn" id="btnContinuePrompt" onclick="continueToChat()">Build Project <i data-lucide="arrow-right"></i></button>
+                </div>
+              </div>
+            </div>
+
           </div>
-          <div class="wizard-footer-center">
-            <div class="progress-bar-track"><div class="progress-bar-fill" id="progressBarFill"></div></div>
-            <div class="progress-row" id="progressRow" role="navigation" aria-label="Wizard steps"></div>
+          <button type="button" class="pb-scroll-cue" id="pbScrollCue" hidden aria-label="Scroll down for more options">
+            <span>Scroll for more</span>
+            <i data-lucide="chevron-down"></i>
+          </button>
+        </section>
+
+        <!-- RIGHT INDUSTRIALIZED DOCK: 3D LIVE PREVIEW + STEP RAIL + SAVED TEMPLATES -->
+        <aside class="pb-preview-pane pb-right-dock" id="pbPreviewPane" aria-label="Live Blueprint Preview & Steps">
+          <div class="pb-preview-header">
+            <div class="pb-preview-tabs" id="pbPreviewTabs" role="tablist">
+              <button type="button" class="pb-preview-tab active" data-pb-preview-tab="visual" role="tab" aria-selected="true">Visual</button>
+              <button type="button" class="pb-preview-tab" data-pb-preview-tab="spec" role="tab" aria-selected="false">Live Spec</button>
+            </div>
+            <div class="pb-preview-head-right">
+              <span class="pb-token-count tabular-nums" id="pbTokenCount">~0 tok</span>
+              <button type="button" class="pb-mobile-close-preview" id="btnPbCloseMobilePreview" aria-label="Close right panel">
+                <i data-lucide="x"></i>
+              </button>
+            </div>
           </div>
-          <div class="wizard-footer-right">
-            <button type="button" class="btn btn-primary" id="wizardNextBtn" onclick="wizardFooterNext()">
-              Next <i data-lucide="arrow-right"></i>
-            </button>
+
+          <div class="pb-dock-scroll" id="pbDockScroll">
+            <!-- Visual 3D Mini-Site Preview -->
+            <div class="pb-preview-visual" id="pbPreviewVisualPane">
+              <div class="pb-mini-card" id="pbMiniSiteCard">
+                <div class="pb-mini-chrome">
+                  <span class="pb-chrome-dots" aria-hidden="true"><span></span><span></span><span></span></span>
+                  <span class="pb-chrome-url" id="pbMiniBrand">Your Brand</span>
+                </div>
+                <div class="pb-mini-site" id="pbMiniSite" data-nav="top" data-hero="centered" data-content="cards" data-density="balanced">
+                  <div class="pv-nav">
+                    <span class="pv-logo-mark"></span>
+                    <div class="pv-nav-links"><span></span><span></span><span></span></div>
+                    <span class="pv-nav-btn"></span>
+                  </div>
+                  <div class="pv-body">
+                    <div class="pv-hero">
+                      <div class="pv-hero-copy">
+                        <div class="pv-headline" id="pbMiniHeadline">Design with precision &amp; clarity</div>
+                        <div class="pv-sub" id="pbMiniSub">Live 3D visual preview adapts immediately as you dial in palettes, type, layout, and freedom.</div>
+                        <div class="pv-cta-row">
+                          <span class="pv-cta-primary" id="pbMiniCta">Start Building</span>
+                          <span class="pv-cta-ghost">Explore</span>
+                        </div>
+                      </div>
+                      <div class="pv-hero-visual" aria-hidden="true">
+                        <div class="pv-vis-bar"></div>
+                        <div class="pv-vis-grid"><span></span><span></span></div>
+                      </div>
+                    </div>
+                    <div class="pv-content" aria-hidden="true">
+                      <div class="pv-block"><span></span><span></span></div>
+                      <div class="pv-block"><span></span><span></span></div>
+                      <div class="pv-block"><span></span><span></span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="pb-preview-meter">
+                <div class="pb-meter-row">
+                  <span class="pb-summary-meta" id="pbSummaryMeta">No category yet · No palette yet · L2 Guided</span>
+                  <span class="tabular-nums pb-depth-val" id="pbCompletenessPct">0%</span>
+                </div>
+                <div class="pb-meter-track"><div class="pb-meter-fill" id="pbCompletenessFill"></div></div>
+              </div>
+            </div>
+
+            <!-- Live Compiled Spec Tab -->
+            <div class="pb-preview-spec" id="pbPreviewSpecPane" hidden>
+              <pre class="pb-live-spec-code" id="pbLiveSpecOutput"></pre>
+            </div>
+
+            <div class="pb-rail-divider"></div>
+
+            <!-- Right-Side Step Index Rail -->
+            <div class="pb-dock-section">
+              <div class="pb-rail-section-label">Steps</div>
+              <nav class="pb-step-rail" id="pbStepRail" aria-label="Prompt Studio steps"></nav>
+            </div>
+
+            <div class="pb-rail-divider"></div>
+
+            <!-- Saved Templates -->
+            <div class="pb-dock-section">
+              <div class="pb-rail-templates-head">
+                <span class="pb-rail-section-label">Templates <span class="pb-rail-count tabular-nums" id="pbTemplatesCount">0</span></span>
+                <button type="button" class="pb-rail-save-btn" id="btnPbRailSaveTemplate" title="Save current selections as template">
+                  <i data-lucide="bookmark-plus"></i>
+                  <span>Save</span>
+                </button>
+              </div>
+              <div class="pb-templates-list" id="pbSavedTemplatesList"></div>
+            </div>
           </div>
-        </footer>
+        </aside>
+
       </div>
     </div>
+
+    <footer id="wizardFooter" class="wizard-footer pb-minimal-footer">
+      <div class="wizard-footer-left">
+        <button type="button" class="btn btn-outline" id="wizardBackBtn" hidden onclick="prevStep()">
+          <i data-lucide="arrow-left"></i> Back
+        </button>
+      </div>
+      <div class="wizard-footer-center">
+        <div class="pb-footer-caption tabular-nums" id="pbFooterCaption">Step 01 of 07 · Start</div>
+        <div class="progress-bar-track"><div class="progress-bar-fill" id="progressBarFill"></div></div>
+      </div>
+      <div class="wizard-footer-right">
+        <button type="button" class="btn btn-skip" id="wizardSkipBtn" hidden onclick="nextStep()">Skip</button>
+        <button type="button" class="btn btn-primary" id="wizardNextBtn" onclick="wizardFooterNext()">
+          Next <i data-lucide="arrow-right"></i>
+        </button>
+      </div>
+    </footer>
   </dialog>
 
   <!-- ============ UI COMPONENT LIBRARY STUDIO MODAL ============ -->
-  <dialog id="uiLibraryModal" class="ui-lib-modal" aria-label="UI Component Library Studio">
+  <dialog id="uiLibraryModal" class="ui-lib-modal" aria-label="Watermelon UI Library">
     <div class="modal-header">
-      <h2><i data-lucide="blocks"></i> UI Component Library Studio</h2>
+      <h2><i data-lucide="blocks"></i> Watermelon UI</h2>
       <div class="ui-lib-header-actions">
-        <button type="button" class="btn btn-outline btn-sm" id="btnUiLibImportGithub">
-          <i data-lucide="github"></i>
-          <span>Import GitHub</span>
+        <button type="button" class="btn btn-ghost btn-sm" id="btnUiLibCanvasTheme" title="Toggle preview canvas theme" aria-label="Toggle preview canvas theme">
+          <i data-lucide="sun"></i>
+          <span id="uiLibCanvasThemeLabel">Light canvas</span>
         </button>
-        <label class="btn btn-outline btn-sm" for="uiLibJsonFileInput" style="cursor:pointer">
-          <i data-lucide="upload"></i>
-          <span>Import JSON</span>
-        </label>
-        <input type="file" id="uiLibJsonFileInput" accept=".json,application/json" class="sr-only">
-        <button type="button" class="btn btn-primary btn-sm" id="btnUiLibNewPack">
-          <i data-lucide="plus"></i>
-          <span>New Library</span>
-        </button>
-        <button class="modal-close" type="button" aria-label="Close UI Library Studio" onclick="this.closest('dialog').close()"><i data-lucide="x"></i></button>
+        <button class="modal-close" type="button" aria-label="Close UI Library" onclick="this.closest('dialog').close()"><i data-lucide="x"></i></button>
       </div>
     </div>
 
@@ -927,20 +1305,29 @@
       </aside>
 
       <section class="ui-lib-stage">
+        <!-- Context Banner (Mix & Match Picker Mode / Chat Attachment Mode) -->
+        <div class="ui-lib-context-banner hidden" id="uiLibContextBanner"></div>
+
         <!-- Inline Sub-Forms (Create Pack / Add Element / Import GitHub / Inspect Code) -->
         <div class="ui-lib-subpanel hidden" id="uiLibSubpanel"></div>
 
         <!-- Library Detail Header -->
         <div class="ui-lib-detail-head" id="uiLibDetailHead"></div>
 
-        <!-- Remote Catalog Search Bar (Awesome Components 6,591+ library) -->
+        <!-- Watermelon UI Six-Collection Sub-Tabs (All / Animated / Components / Blocks / Dashboards / Templates / Resources) -->
+        <div class="ui-lib-collection-bar hidden" id="uiLibCollectionBar" role="tablist" aria-label="Watermelon UI collections"></div>
+
+        <!-- Remote Catalog Search Bar -->
         <div class="ui-lib-search-row hidden" id="uiLibSearchBar"></div>
 
-        <!-- Category Filter Tabs (All + 12 Essential UI Building Blocks) -->
+        <!-- Category Filter Tabs (or 22 Watermelon Block Categories) -->
         <div class="ui-lib-cat-bar" id="uiLibCategoryBar" role="tablist" aria-label="UI element categories"></div>
 
         <!-- Live Rendered Element Gallery -->
         <div class="ui-lib-elements-grid" id="uiLibElementsGrid"></div>
+
+        <!-- Docked Block Page Assembler Tray -->
+        <div class="ui-lib-assembler-tray hidden" id="uiLibAssemblerTray" aria-label="Section-by-section Page Assembler"></div>
       </section>
     </div>
   </dialog>
@@ -1042,143 +1429,7 @@
     </div>
   </dialog>
 
-  <!-- ============ SETTINGS MODAL ============ -->
-  <dialog id="settingsModal">
-    <div class="modal-header">
-      <h2><i data-lucide="settings"></i> Model, Provider &amp; Skills</h2>
-      <button class="modal-close" type="button" aria-label="Close settings" onclick="this.closest('dialog').close()"><i data-lucide="x"></i></button>
-    </div>
-    <div class="modal-body settings-body">
-      <div class="settings-grid">
-        <div class="form-group" id="modalProviderGroup">
-          <label for="modalProviderType">Provider</label>
-          <select id="modalProviderType">
-            <option value="openrouter">OpenRouter</option>
-            <option value="lmstudio">LM Studio</option>
-            <option value="ollama">Ollama</option>
-            <option value="custom">Custom OpenAI-Compatible</option>
-          </select>
-        </div>
-        <div class="form-group" id="modalApiKeyGroup">
-          <label for="modalApiKey">API Key</label>
-          <input type="password" id="modalApiKey" placeholder="sk-or-v1-..." autocomplete="off">
-        </div>
-        <div class="form-group settings-span-2" id="modalBaseUrlGroup" style="display:none">
-          <label for="modalBaseUrl">Base URL</label>
-          <input type="text" id="modalBaseUrl" placeholder="http://localhost:1234/v1">
-        </div>
-      </div>
 
-      <div class="form-group model-picker-group">
-        <div class="model-picker-label-row">
-          <label for="modelSearch">Model</label>
-          <span class="model-count tabular-nums" id="modelCountHint"></span>
-        </div>
-        <div class="model-combobox" id="modelCombobox">
-          <button type="button" class="model-combobox-trigger" id="modelComboboxTrigger" aria-haspopup="listbox" aria-expanded="false">
-            <span id="modelComboboxLabel">No models loaded</span>
-            <i data-lucide="chevron-down"></i>
-          </button>
-          <div class="model-combobox-panel" id="modelComboboxPanel" hidden>
-            <div class="model-combobox-tools">
-              <input type="search" id="modelSearch" placeholder="Search models…" autocomplete="off">
-              <div class="model-filter-chips" id="modelFreeFilterRow" hidden>
-                <button type="button" class="model-chip active" data-filter="all">All</button>
-                <button type="button" class="model-chip" data-filter="free">Free</button>
-              </div>
-            </div>
-            <div class="model-combobox-list" id="modelComboboxList" role="listbox"></div>
-          </div>
-        </div>
-        <select id="modelSelect" class="sr-only" tabindex="-1" aria-hidden="true">
-          <option value="">No models loaded</option>
-        </select>
-      </div>
-
-      <div class="settings-actions">
-        <button type="button" class="btn btn-outline" id="btnTestConnection">Test Connect</button>
-        <button type="button" class="btn btn-outline" id="btnFetchModels">Load Models</button>
-      </div>
-
-      <div class="settings-grid settings-params settings-params-4">
-        <div class="form-group">
-          <label for="modalTemperature">Temperature</label>
-          <input type="number" id="modalTemperature" min="0" max="2" step="0.1" value="0.7">
-        </div>
-        <div class="form-group">
-          <label for="modalTopP">Top-P</label>
-          <input type="number" id="modalTopP" min="0" max="1" step="0.05" value="0.95">
-        </div>
-        <div class="form-group">
-          <label for="modalMaxTokens">Max Output</label>
-          <input type="number" id="modalMaxTokens" min="1024" max="128000" step="1024" value="16384">
-        </div>
-        <div class="form-group">
-          <label for="modalContextWindow">Context Window</label>
-          <input type="number" id="modalContextWindow" min="2048" max="1048576" step="1024" value="32768">
-        </div>
-      </div>
-
-      <div class="settings-capabilities">
-        <div class="settings-skills-head">
-          <h3>Agent Engine &amp; Free Web Search</h3>
-          <button type="button" class="btn btn-outline btn-sm" id="btnTestWebSearch"><i data-lucide="globe"></i> Test Web Search</button>
-        </div>
-        <div class="sys-skills-list">
-          <label class="sys-skill-row">
-            <span class="sys-skill-copy">
-              <strong>Parallel Sub-Agents (Auto Fallback)</strong>
-              <small>Runs Design, Sections, and App agents simultaneously during builds; automatically switches to one-by-one if the model rejects concurrency.</small>
-            </span>
-            <input type="checkbox" class="m3-switch" id="toggleSettingsSubAgents" checked aria-label="Toggle Parallel Sub-Agents">
-          </label>
-          <label class="sys-skill-row">
-            <span class="sys-skill-copy">
-              <strong>Free Keyless Web Search</strong>
-              <small>Grounds builds with live web search (DuckDuckGo + Wikipedia + Web Index). Auto-configured by start.bat with zero API keys.</small>
-            </span>
-            <input type="checkbox" class="m3-switch" id="toggleSettingsWebSearch" checked aria-label="Toggle Free Keyless Web Search">
-          </label>
-        </div>
-        <div class="web-search-test-result hidden" id="webSearchTestResult"></div>
-      </div>
-
-      <div class="settings-skills">
-        <div class="settings-skills-head">
-          <h3>Skills</h3>
-          <button type="button" class="btn btn-outline btn-sm" id="btnToggleCustomSkillForm"><i data-lucide="plus"></i> Custom Skill</button>
-        </div>
-        <div class="skill-import-box">
-          <div class="skill-import-row">
-            <input type="text" id="githubSkillUrl" placeholder="Paste GitHub URL or owner/repo (e.g. https://github.com/dietrichgebert/ponytail)" autocomplete="off">
-            <button type="button" class="btn btn-outline btn-sm" id="btnImportGithubSkill">Scan &amp; Add</button>
-          </div>
-          <div class="gh-discover-results hidden" id="githubSkillDiscoverResults"></div>
-          <div class="custom-skill-form hidden" id="customSkillForm">
-            <input type="text" id="customSkillName" placeholder="Skill name (e.g. Strict TypeScript)">
-            <input type="text" id="customSkillDesc" placeholder="Short description">
-            <textarea id="customSkillPrompt" rows="3" placeholder="System prompt instructions for the AI…"></textarea>
-            <div class="custom-skill-form-actions">
-              <button type="button" class="btn btn-ghost btn-sm" id="btnCancelCustomSkill">Cancel</button>
-              <button type="button" class="btn btn-primary btn-sm" id="btnSaveCustomSkill">Save Skill</button>
-            </div>
-          </div>
-        </div>
-        <div id="skillsList" class="skills-settings-list"></div>
-      </div>
-    </div>
-  </dialog>
-
-  <!-- Skills Prompt Preview Modal -->
-  <dialog id="skillPromptModal">
-    <div class="modal-header">
-      <h2><i data-lucide="braces"></i> Skill Prompt</h2>
-      <button class="modal-close" type="button" aria-label="Close skill preview" onclick="this.closest('dialog').close()"><i data-lucide="x"></i></button>
-    </div>
-    <div class="modal-body">
-      <textarea id="skillPromptPreview" class="skill-prompt-textarea" readonly rows="12"></textarea>
-    </div>
-  </dialog>
 
   <!-- Reusable Confirm / Prompt Modal -->
   <dialog id="appPromptModal">
@@ -1198,10 +1449,101 @@
     </div>
   </dialog>
 
+  <!-- ============ WORKSPACE SECTION SWAPPER POPUP ("CHANGE THIS TO THAT") ============ -->
+  <dialog id="sectionSwapModal" class="swap-modal" aria-label="Swap Section from UI Library">
+    <header class="swap-modal-header">
+      <div class="swap-header-left">
+        <span class="swap-header-icon" aria-hidden="true"><i data-lucide="replace"></i></span>
+        <div>
+          <h2>Swap Section from UI Library</h2>
+          <p>Pick any verified Watermelon UI replacement block, animated component, or dashboard section</p>
+        </div>
+      </div>
+      <button class="modal-close" type="button" id="btnSwapClose" aria-label="Close section swapper"><i data-lucide="x"></i></button>
+    </header>
+
+    <div class="swap-inspected-banner" id="swapInspectedBanner" hidden>
+      <div class="swap-inspected-info">
+        <i data-lucide="crosshair"></i>
+        <span>Targeting inspected element:</span>
+        <code id="swapInspectedSelector"></code>
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm" id="btnSwapClearInspect">Clear Target</button>
+    </div>
+
+    <div class="swap-slot-bar" id="swapSlotTabs" role="tablist" aria-label="Target section slot"></div>
+
+    <div class="swap-modal-body">
+      <aside class="swap-catalog-col" aria-label="Component catalog">
+        <div class="swap-lib-filters" id="swapLibraryFilters"></div>
+        <div class="swap-search-row">
+          <div class="swap-search-wrap">
+            <i data-lucide="search"></i>
+            <input type="search" id="swapSearchInput" placeholder="Search replacement components…" autocomplete="off" aria-label="Search replacement components">
+          </div>
+          <button type="button" class="swap-blocks-toggle active" id="btnSwapBlocksFirst" aria-pressed="true" title="Prioritize full-width page Blocks ahead of small primitives">
+            Blocks First
+          </button>
+          <span class="swap-results-count tabular-nums" id="swapResultsCount">0</span>
+        </div>
+        <div class="swap-cand-list" id="swapCandidateList"></div>
+      </aside>
+
+      <section class="swap-preview-col" aria-label="Replacement preview">
+        <div class="swap-preview-topbar">
+          <div class="swap-selected-copy">
+            <strong id="swapSelectedTitle">Select a replacement component</strong>
+            <span id="swapSelectedMeta">Choose any block from the left catalog</span>
+          </div>
+          <div class="swap-preview-controls">
+            <div class="swap-view-seg" role="tablist" aria-label="Preview or code">
+              <button type="button" class="swap-view-btn active" data-swap-view="preview" role="tab" aria-selected="true">Preview</button>
+              <button type="button" class="swap-view-btn" data-swap-view="code" role="tab" aria-selected="false">Code</button>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm" id="btnSwapPreviewTheme" title="Toggle preview canvas theme">
+              <i data-lucide="sun"></i>
+              <span id="swapPreviewThemeLabel">Light</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="swap-preview-stage">
+          <div class="swap-iframe-wrap" id="swapPreviewFrameWrap">
+            <iframe id="swapPreviewIframe" title="Replacement component live preview" sandbox="allow-scripts allow-same-origin"></iframe>
+          </div>
+          <pre class="swap-code-view" id="swapCodeView" hidden></pre>
+        </div>
+
+        <div class="swap-apply-controls">
+          <div class="swap-adherence-row">
+            <span class="swap-adherence-label">AI Fidelity</span>
+            <div class="swap-adherence-seg" role="group" aria-label="AI swap fidelity">
+              <button type="button" class="swap-adh-btn active" data-swap-adherence="adapt" aria-pressed="true">Adapt to Project Theme</button>
+              <button type="button" class="swap-adh-btn" data-swap-adherence="strict" aria-pressed="false">Strict Copy-Paste</button>
+            </div>
+          </div>
+          <p class="swap-adherence-hint" id="swapAdherenceHint">Theme adapted: preserves layout structure while matching your project colors, fonts &amp; tone.</p>
+          <div class="swap-action-bar">
+            <input type="text" id="swapNoteInput" class="swap-note-input" placeholder="Optional tweak note (e.g. Keep our brand headline and 3 nav links)…" autocomplete="off">
+            <button type="button" class="btn btn-outline" id="btnSwapCancel">Cancel</button>
+            <button type="button" class="btn btn-primary" id="btnSwapApply" disabled>
+              <i data-lucide="sparkles"></i>
+              <span>Replace Section with AI</span>
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </dialog>
+
   <!-- Element Inspector Tooltip -->
   <div class="element-tooltip" id="elementTooltip">
     <code class="tooltip-label"></code>
     <div class="tooltip-actions">
+      <button type="button" class="btn btn-sm btn-outline" id="btnTooltipSwapLibrary" title="Replace this section using a UI Library component">
+        <i data-lucide="replace"></i>
+        <span>Swap from Library</span>
+      </button>
       <button type="button" class="btn btn-sm btn-primary" id="btnEditSelectedEl">Edit with AI</button>
       <button type="button" class="btn btn-sm btn-ghost" id="btnDismissSelectedEl" aria-label="Dismiss"><i data-lucide="x"></i></button>
     </div>

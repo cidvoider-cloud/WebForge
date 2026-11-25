@@ -8,6 +8,13 @@
  *   3. Code-only React JSX/TSX custom components (live Babel + React runtime)
  */
 
+import { buildTsxSandboxScript } from './ui-tsx-sandbox.mjs';
+import { PREVIEW_KIT_MANIFEST, buildScopedLibraryThemeCss } from './ui-library-schema.mjs';
+
+function stripExternalFontImports(css = '') {
+  return String(css || '').replace(/@import\s+url\(['"]?https?:\/\/[^'")]+['"]?\)\s*;?/gi, '');
+}
+
 function escapeScriptSafe(str) {
   return String(str || '').replace(/<\/script>/gi, '<\\/script>');
 }
@@ -279,13 +286,24 @@ export function needsVibrantPrimaryAccent(rawHtml = '') {
  * fallback, authentic <canvas> handling, collapsed media/fan-carousel layout rescue,
  * Framer Motion opacity:0 unfreezing, and non-destructive entrance animation script.
  */
-function buildInteractiveRuntimeScript({ hasCustomScript = false, animate = true, screenshotUrl = '', canvasOnly = false } = {}) {
+function buildInteractiveRuntimeScript({
+  hasCustomScript = false,
+  animate = true,
+  screenshotUrl = '',
+  canvasOnly = false,
+  lightVariantHtml = '',
+  darkVariantHtml = '',
+} = {}) {
   const safeShotUrl = JSON.stringify(String(screenshotUrl || ''));
+  const safeLightHtml = JSON.stringify(String(lightVariantHtml || '')).replace(/<\/script>/gi, '<\\/script>');
+  const safeDarkHtml = JSON.stringify(String(darkVariantHtml || '')).replace(/<\/script>/gi, '<\\/script>');
   return `
 <script>
 (function () {
   var WF_SCREENSHOT_URL = ${safeShotUrl};
   var WF_CANVAS_ONLY = ${canvasOnly ? 'true' : 'false'};
+  var WF_LIGHT_HTML = ${safeLightHtml};
+  var WF_DARK_HTML = ${safeDarkHtml};
   var toastTimer = null;
   function showPreviewToast(msg) {
     var el = document.getElementById('wfPreviewToast');
@@ -775,6 +793,13 @@ function buildInteractiveRuntimeScript({ hasCustomScript = false, animate = true
     document.documentElement.setAttribute('data-preview-theme', isDark ? 'dark' : 'light');
     document.body.classList.toggle('wf-preview-light', !isDark);
     document.body.classList.toggle('wf-preview-dark', isDark);
+    if (WF_LIGHT_HTML && WF_DARK_HTML) {
+      var stage = document.getElementById('wfStageRoot');
+      if (stage) {
+        stage.innerHTML = isDark ? WF_DARK_HTML : WF_LIGHT_HTML;
+        wireImageFallbacks();
+      }
+    }
   }
 
   window.addEventListener('message', function (e) {
@@ -1302,8 +1327,8 @@ const SHARED_ANIMATION_CSS = `
  * Tailwind CSS v4 Browser CDN + full shadcn/ui v2 `@theme inline` +
  * `@custom-variant dark` + Aceternity / MagicUI / Radix keyframe animations.
  */
-export const TAILWIND_V4_CDN_HEAD = `
-<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+export const PREVIEW_KIT_TAILWIND_HEAD = `
+<script src="${PREVIEW_KIT_MANIFEST.runtimeAssets.tailwind}"></script>
 <style type="text/tailwindcss">
   @custom-variant dark (&:where(.dark, .dark *));
 
@@ -1472,8 +1497,9 @@ export const TAILWIND_V4_CDN_HEAD = `
   }
 </style>`;
 
-// Backwards-compatible alias for preview.mjs
-export const SHADCN_TAILWIND_CONFIG_SCRIPT = TAILWIND_V4_CDN_HEAD;
+// Backwards-compatible aliases for preview.mjs and tests
+export const TAILWIND_V4_CDN_HEAD = PREVIEW_KIT_TAILWIND_HEAD;
+export const SHADCN_TAILWIND_CONFIG_SCRIPT = PREVIEW_KIT_TAILWIND_HEAD;
 
 export const SHADCN_THEME_VARS_CSS = `
   :root {
@@ -1729,28 +1755,56 @@ export const SHADCN_THEME_VARS_CSS = `
 /**
  * Builds an animated, interactive HTML document for the Fullscreen UI Previewer.
  */
-export function buildInteractivePreviewSrcdoc({ lib = null, element = null, theme = 'dark', animate = true } = {}) {
+export function buildInteractivePreviewSrcdoc({ lib = null, element = null, theme = 'dark', animate = true, compactCard = false } = {}) {
   const safeEl = element || {};
+  const libraryId = String(lib?.id || safeEl.library || 'shadcn-ui').replace(/[^a-z0-9_-]/gi, '') || 'shadcn-ui';
+  const scopedLibCss = buildScopedLibraryThemeCss(libraryId);
   const isDark = theme !== 'light';
   const htmlClass = isDark ? 'dark' : '';
   const bodyThemeClass = isDark ? 'wf-preview-dark' : 'wf-preview-light';
+  const elIdAttr = escapeHtmlAttr(String(safeEl.id || safeEl.name || ''));
 
-  // Mode 1: Awesome Components (rendered Tailwind v4/shadcn/Aceternity HTML snapshot)
+  const htmlStatusProbeScript = `<script>
+  (function () {
+    function postStatus(payload) {
+      window.__wfPreviewStatus = payload;
+      try { window.parent.postMessage(Object.assign({ type: 'wf-preview-status', id: ${JSON.stringify(String(safeEl.id || ''))}, libraryId: ${JSON.stringify(libraryId)} }, payload), '*'); } catch (_) {}
+    }
+    window.addEventListener('error', function (ev) {
+      postStatus({ ok: false, reasonCode: 'RUNTIME_ERROR', message: String(ev && ev.message || 'Preview runtime error'), stack: String(ev && ev.error && ev.error.stack || '') });
+    });
+    window.addEventListener('load', function () {
+      setTimeout(function () {
+        var root = document.getElementById('wfStageRoot');
+        var rect = root ? root.getBoundingClientRect() : { width: 0, height: 0 };
+        var hasDom = Boolean(root && (root.children.length > 0 || (root.textContent || '').trim().length > 0));
+        var ok = hasDom && rect.width > 0 && rect.height > 0;
+        postStatus({ ok: ok, reasonCode: ok ? null : 'BLANK', message: ok ? '' : 'Component rendered empty bounds', width: Math.round(rect.width), height: Math.round(rect.height) });
+      }, 120);
+    });
+  })();
+</script>`;
+
+  // Mode 1: Awesome Components & HyperUI (rendered Tailwind v4 HTML + optional paired dark HTML)
   if (safeEl.renderedHtml) {
-    const { bodyHtml, extraCss } = sanitizeAwesomeRenderedHtml(safeEl.renderedHtml);
-    const promptCss = String(safeEl.promptCss || '').trim();
+    const lightSanitized = sanitizeAwesomeRenderedHtml(safeEl.renderedHtml);
+    const darkSanitized = safeEl.darkRenderedHtml ? sanitizeAwesomeRenderedHtml(safeEl.darkRenderedHtml) : null;
+    const activeSanitized = isDark && darkSanitized ? darkSanitized : lightSanitized;
+    const bodyHtml = activeSanitized.bodyHtml;
+    const extraCss = stripExternalFontImports([lightSanitized.extraCss, darkSanitized?.extraCss].filter(Boolean).join('\n'));
+    const promptCss = stripExternalFontImports(String(safeEl.promptCss || safeEl.css || '').trim());
     const canvasOnly = isCanvasOnlySnapshot(bodyHtml);
     const fullBleedSurface = canvasOnly || /\b(?:min-h-\[600px\]|h-\[640px\])\b/.test(bodyHtml);
     const vibrantAccentOverride = (needsVibrantPrimaryAccent(bodyHtml) && !/--primary\s*:/i.test(promptCss) && !/--primary\s*:/i.test(extraCss))
       ? `
-  :root {
+  [data-lib="${libraryId}"] {
     --primary: 221.2 83.2% 53.3%;
     --primary-foreground: 210 40% 98%;
     --accent: 217 91% 95%;
     --accent-foreground: 222 47% 11%;
     --ring: 221.2 83.2% 53.3%;
   }
-  .dark {
+  [data-lib="${libraryId}"].dark {
     --primary: 217.2 91.2% 59.8%;
     --primary-foreground: 222.2 47.4% 11.2%;
     --accent: 217 33% 17%;
@@ -1759,35 +1813,34 @@ export function buildInteractivePreviewSrcdoc({ lib = null, element = null, them
   }`
       : '';
     return `<!DOCTYPE html>
-<html lang="en" class="${htmlClass}" data-preview-theme="${isDark ? 'dark' : 'light'}">
+<html lang="en" class="${htmlClass}" data-lib="${escapeHtmlAttr(libraryId)}" data-component-id="${elIdAttr}" data-preview-theme="${isDark ? 'dark' : 'light'}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
-${TAILWIND_V4_CDN_HEAD}
+${PREVIEW_KIT_TAILWIND_HEAD}
 <style>
   ${SHADCN_THEME_VARS_CSS}
+  ${scopedLibCss}
   ${vibrantAccentOverride}
   *, *::before, *::after { box-sizing: border-box; border-color: hsl(var(--border)); }
-  html { height: 100%; margin: 0; padding: 0; }
+  html { height: 100%; margin: 0; padding: 0; ${compactCard ? 'overflow: hidden;' : ''} }
   body {
     margin: 0;
     min-height: 100%;
-    overflow-x: hidden;
-    font-family: Inter, system-ui, -apple-system, sans-serif;
+    ${compactCard ? 'height: 100%; overflow: hidden;' : 'overflow-x: hidden;'}
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: hsl(var(--background));
     color: hsl(var(--foreground));
     transition: background-color 200ms ease, color 200ms ease;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: ${fullBleedSurface ? '0' : '32px 24px'};
+    padding: ${fullBleedSurface ? '0' : compactCard ? '18px 20px' : '32px 24px'};
   }
   #wfStageRoot {
     margin: auto 0;
     width: 100%;
-    max-width: ${fullBleedSurface ? '100%' : '1200px'};
+    max-width: ${fullBleedSurface || compactCard ? '100%' : '1200px'};
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1803,33 +1856,38 @@ ${TAILWIND_V4_CDN_HEAD}
   ${SHARED_ANIMATION_CSS}
 </style>
 </head>
-<body class="${bodyThemeClass}">
+<body class="${bodyThemeClass}" data-lib="${escapeHtmlAttr(libraryId)}">
   <div id="wfStageRoot">${bodyHtml}</div>
-  <div id="wfPreviewToast" role="status" aria-live="polite"></div>
-  ${buildInteractiveRuntimeScript({ hasCustomScript: false, animate, screenshotUrl: safeEl.screenshotUrl || '', canvasOnly })}
+  ${compactCard ? '' : '<div id="wfPreviewToast" role="status" aria-live="polite"></div>'}
+  ${buildInteractiveRuntimeScript({
+    hasCustomScript: false,
+    animate: compactCard ? false : animate,
+    screenshotUrl: safeEl.screenshotUrl || '',
+    canvasOnly,
+    lightVariantHtml: darkSanitized ? lightSanitized.bodyHtml : '',
+    darkVariantHtml: darkSanitized ? darkSanitized.bodyHtml : '',
+  })}
+  ${htmlStatusProbeScript}
 </body>
 </html>`;
   }
 
-  // Mode 2: Built-in / 21st.dev / Custom HTML preview element
+  // Mode 2: Custom HTML preview element
   if (safeEl.previewHtml) {
-    const fontsLink = lib?.fontsUrl
-      ? `<link rel="stylesheet" href="${escapeHtmlAttr(lib.fontsUrl)}">`
-      : '';
-    const tokensCss = lib?.tokensCss || '';
-    const extraCss = safeEl.previewCss || '';
+    const tokensCss = stripExternalFontImports(lib?.tokensCss || '');
+    const extraCss = stripExternalFontImports(safeEl.previewCss || safeEl.css || '');
     const customScript = safeEl.previewScript
       ? `<script>${escapeScriptSafe(safeEl.previewScript)}</script>`
       : '';
     const stageMaxWidth = safeEl.previewScript ? '820px' : '640px';
 
     return `<!DOCTYPE html>
-<html lang="en" class="${htmlClass}" data-preview-theme="${isDark ? 'dark' : 'light'}">
+<html lang="en" class="${htmlClass}" data-lib="${escapeHtmlAttr(libraryId)}" data-component-id="${elIdAttr}" data-preview-theme="${isDark ? 'dark' : 'light'}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-${fontsLink}
 <style>
+  ${scopedLibCss}
   *, *::before, *::after { box-sizing: border-box; }
   html { height: 100%; margin: 0; padding: 0; }
   body {
@@ -1867,85 +1925,75 @@ ${fontsLink}
   ${SHARED_ANIMATION_CSS}
 </style>
 </head>
-<body class="wf-ui-scope ${bodyThemeClass}">
+<body class="wf-ui-scope ${bodyThemeClass}" data-lib="${escapeHtmlAttr(libraryId)}">
   <div id="wfStageRoot">${safeEl.previewHtml}</div>
   <div id="wfPreviewToast" role="status" aria-live="polite"></div>
   ${customScript}
   ${buildInteractiveRuntimeScript({ hasCustomScript: Boolean(safeEl.previewScript), animate })}
+  ${htmlStatusProbeScript}
 </body>
 </html>`;
   }
 
-  // Mode 3: Code-only React JSX/TSX element (live Babel + React + Lucide + Tailwind v4 sandbox)
+  // Mode 3: React JSX/TSX element (Kokonut UI, Watermelon UI, shadcn/ui v4, and custom TSX via local offline Preview Kit)
   const rawCode = String(safeEl.code || '').trim();
-  const safeCodeJson = JSON.stringify(rawCode).replace(/<\/script>/gi, '<\\/script>');
-  const fallbackName = escapeHtmlAttr(safeEl.name || 'UI Component');
+  const extraCss = stripExternalFontImports(String(safeEl.css || safeEl.promptCss || '').trim());
+  const tsxScript = buildTsxSandboxScript({
+    code: rawCode,
+    demoCode: String(safeEl.demoCode || '').trim(),
+    auxiliaryFiles: Array.isArray(safeEl.auxiliaryFiles) ? safeEl.auxiliaryFiles : [],
+    sourcePath: String(safeEl.sourcePath || '').trim(),
+    name: safeEl.name || safeEl.title || 'UI Component',
+    id: String(safeEl.id || ''),
+    libraryId,
+    samplePropsOverride: safeEl.sampleProps || null,
+  });
 
   return `<!DOCTYPE html>
-<html lang="en" class="${htmlClass}" data-preview-theme="${isDark ? 'dark' : 'light'}">
+<html lang="en" class="${htmlClass}" data-lib="${escapeHtmlAttr(libraryId)}" data-component-id="${elIdAttr}" data-preview-theme="${isDark ? 'dark' : 'light'}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
-${TAILWIND_V4_CDN_HEAD}
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+${PREVIEW_KIT_TAILWIND_HEAD}
+<script src="${PREVIEW_KIT_MANIFEST.runtimeAssets.react}"></script>
+<script src="${PREVIEW_KIT_MANIFEST.runtimeAssets.reactDom}"></script>
+<script src="${PREVIEW_KIT_MANIFEST.runtimeAssets.babel}"></script>
 <style>
   ${SHADCN_THEME_VARS_CSS}
-  ${lib?.tokensCss || ''}
+  ${scopedLibCss}
   *, *::before, *::after { box-sizing: border-box; border-color: hsl(var(--border)); }
-  html { height: 100%; margin: 0; padding: 0; }
+  html { height: 100%; margin: 0; padding: 0; ${compactCard ? 'overflow: hidden;' : ''} }
   body {
     margin: 0;
     min-height: 100%;
-    font-family: Inter, system-ui, sans-serif;
+    ${compactCard ? 'height: 100%; overflow: hidden;' : ''}
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: hsl(var(--background));
     color: hsl(var(--foreground));
+    transition: background-color 200ms ease, color 200ms ease;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 32px 24px;
+    padding: ${compactCard ? '18px 20px' : '32px 24px'};
   }
-  #wfStageRoot { margin: auto 0; width: 100%; max-width: 960px; display: flex; justify-content: center; }
+  #wfStageRoot {
+    margin: auto 0;
+    width: 100%;
+    max-width: ${compactCard ? '100%' : '960px'};
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  ${extraCss}
   ${SHARED_ANIMATION_CSS}
 </style>
 </head>
-<body class="wf-ui-scope ${bodyThemeClass}">
+<body class="wf-ui-scope ${bodyThemeClass}" data-lib="${escapeHtmlAttr(libraryId)}">
   <div id="wfStageRoot"></div>
-  <div id="wfPreviewToast" role="status" aria-live="polite"></div>
-  <script>
-    (function () {
-      var raw = ${safeCodeJson};
-      var mount = document.getElementById('wfStageRoot');
-      function cn() {
-        return Array.prototype.slice.call(arguments).filter(Boolean).join(' ');
-      }
-      try {
-        var stripped = raw
-          .replace(/^\\s*import\\s+[\\s\\S]*?from\\s+['"][^'"]+['"];?\\s*$/gm, '')
-          .replace(/^\\s*import\\s+['"][^'"]+['"];?\\s*$/gm, '')
-          .replace(/export\\s+default\\s+function\\s+([A-Za-z0-9_]+)/g, 'function $1; window.__WF_EXPORT__ = $1; function $1')
-          .replace(/export\\s+default\\s+/g, 'window.__WF_EXPORT__ = ')
-          .replace(/export\\s+(function|const|class)\\s+/g, '$1 ');
-        var nameMatch = raw.match(/export\\s+(?:default\\s+)?function\\s+([A-Za-z0-9_]+)/) || raw.match(/export\\s+const\\s+([A-Za-z0-9_]+)/);
-        var exportTail = nameMatch ? '\\nif (!window.__WF_EXPORT__ && typeof ' + nameMatch[1] + ' === "function") window.__WF_EXPORT__ = ' + nameMatch[1] + ';' : '';
-        var compiled = Babel.transform(stripped + exportTail, { presets: ['react', 'typescript'], filename: 'preview.tsx' }).code;
-        var fn = new Function('React', 'useState', 'useEffect', 'useRef', 'useMemo', 'useCallback', 'cn', compiled);
-        fn(React, React.useState, React.useEffect, React.useRef, React.useMemo, React.useCallback, cn);
-        var Comp = window.__WF_EXPORT__;
-        if (typeof Comp === 'function') {
-          ReactDOM.createRoot(mount).render(React.createElement(Comp));
-        } else {
-          mount.innerHTML = '<div class="p-6 rounded-xl border border-border bg-card text-sm text-muted-foreground">Live preview rendered for ${fallbackName} — switch to Code or Split view to inspect source.</div>';
-        }
-      } catch (err) {
-        mount.innerHTML = '<div class="p-6 rounded-xl border border-border bg-card text-sm text-muted-foreground">Switch to <strong>Code</strong> or <strong>Split</strong> view to inspect <strong>${fallbackName}</strong>.</div>';
-      }
-    })();
-  </script>
-  ${buildInteractiveRuntimeScript({ hasCustomScript: false, animate })}
+  ${compactCard ? '' : '<div id="wfPreviewToast" role="status" aria-live="polite"></div>'}
+  ${tsxScript}
+  ${compactCard ? '' : buildInteractiveRuntimeScript({ hasCustomScript: true, animate })}
 </body>
 </html>`;
 }

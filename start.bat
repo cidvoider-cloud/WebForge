@@ -1,167 +1,214 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
+chcp 65001 >nul 2>&1
+title WebForge Studio Launcher
 cd /d "%~dp0"
-title WebForge Launcher
 
 set "PORT=3000"
-set "URL=http://127.0.0.1:%PORT%/index.html"
-set "HEALTH_URL=http://127.0.0.1:%PORT%/api/health"
-set "NODE_CMD="
-set "PYTHON_CMD="
-set "SERVER_MODE="
+if not "%~1"=="" set "PORT=%~1"
+set "URL=http://127.0.0.1:%PORT%"
+set "ERR_COUNT=0"
+set "NODE_VER="
+set "NODE_MAJOR=0"
 
 echo.
-echo  ==========================================================
-echo   WebForge Studio — Automatic Setup & Free Web Search
-echo  ==========================================================
+echo ==========================================================
+echo   WEBFORGE STUDIO -- VERIFY, DOWNLOAD ^& LAUNCH
+echo ==========================================================
+echo   Folder : %CD%
+echo   Target : %URL%
 echo.
 
-REM ── 1) Verify required ES module & server files ──
-call :require_file "index.html" || goto :fail
-call :require_file "css\app.css" || goto :fail
-call :require_file "css\prompt-builder.css" || goto :fail
-call :require_file "js\main.mjs" || goto :fail
-call :require_file "js\modules\studio.mjs" || goto :fail
-call :require_file "js\modules\providers.mjs" || goto :fail
-call :require_file "js\modules\skills.mjs" || goto :fail
-call :require_file "js\modules\web-search.mjs" || goto :fail
-call :require_file "js\modules\sub-agents.mjs" || goto :fail
-call :require_file "tools\serve.mjs" || goto :fail
-call :require_file "tools\search-engine.mjs" || goto :fail
-echo  [OK] Core WebForge Studio modules present
+REM ==========================================================
+REM  PHASE 1: BOOTSTRAP, DEPENDENCY CHECK ^& AUTO-DOWNLOAD
+REM ==========================================================
 
-REM ── 2) Prefer Node.js 18+ (powers built-in free keyless Web Search & GitHub Skill Discovery) ──
-where node >nul 2>&1
-if not errorlevel 1 (
-  node -e "process.exit(Number(process.versions.node.split('.')[0]) >= 18 ? 0 : 1)" >nul 2>&1
-  if not errorlevel 1 (
-    set "NODE_CMD=node"
-    set "SERVER_MODE=node"
-    for /f "delims=" %%V in ('node -v 2^>nul') do echo  [OK] Node.js found ^(%%V^) — Free keyless Web Search enabled
-  ) else (
-    echo  [!!] Node.js found, but version 18+ is required for built-in Web Search.
+echo [STEP 1/5] Checking launcher bootstrap files...
+set "BOOT_MISSING="
+for %%F in (
+  "index.html"
+  "tools\serve.mjs"
+  "tools\preflight-check.mjs"
+) do (
+  if not exist "%%~F" (
+    set "BOOT_MISSING=!BOOT_MISSING! %%~F"
   )
 )
 
-REM ── 3) Auto-install Node.js LTS via winget if missing so Web Search sets up automatically ──
-if not defined NODE_CMD (
-  echo  [..] Node.js 18+ not found. Attempting automatic setup via winget...
-  where winget >nul 2>&1
-  if not errorlevel 1 (
-    winget install -e --id OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
-    if not errorlevel 1 (
-      REM Refresh PATH for current session if installed in standard location
-      if exist "%ProgramFiles%\nodejs\node.exe" (
-        set "PATH=%ProgramFiles%\nodejs;%PATH%"
-        set "NODE_CMD=node"
-        set "SERVER_MODE=node"
-        echo  [OK] Node.js LTS installed automatically! Free Web Search is ready.
-      ) else (
-        echo  [OK] Node.js LTS installed. Close this window and double-click start.bat again.
-        goto :fail
-      )
-    )
-  )
+if defined BOOT_MISSING (
+  call :add_error "ERR_BOOTSTRAP_MISSING" "Core Files" "Critical launcher files are missing:%BOOT_MISSING%" "Extract the complete WebForge ZIP archive (do not run start.bat from inside a compressed ZIP preview) and try again."
+  goto :error_section
 )
-
-REM ── 4) Fallback to Python static server only if Node.js could not be installed ──
-if not defined SERVER_MODE (
-  where py >nul 2>&1
-  if not errorlevel 1 (
-    py -3 -c "import sys; raise SystemExit(0 if sys.version_info >= (3,8) else 1)" >nul 2>&1
-    if not errorlevel 1 set "PYTHON_CMD=py -3"
-  )
-  if not defined PYTHON_CMD (
-    where python >nul 2>&1
-    if not errorlevel 1 (
-      python -c "import sys; raise SystemExit(0 if sys.version_info >= (3,8) else 1)" >nul 2>&1
-      if not errorlevel 1 set "PYTHON_CMD=python"
-    )
-  )
-  if defined PYTHON_CMD (
-    set "SERVER_MODE=python"
-    echo  [!!] Running in static Python fallback mode ^(browser-direct fallback search only^).
-    echo       Install Node.js LTS from https://nodejs.org for full DuckDuckGo Web Search.
-  ) else (
-    echo  [FAIL] Neither Node.js 18+ nor Python 3 was found.
-    echo         Install Node.js LTS from https://nodejs.org and double-click start.bat again.
-    goto :fail
-  )
-)
-
-REM ── 5) Check internet connectivity for CDN preview & free Web Search ──
+echo   [OK] Core launcher bootstrap files found.
 echo.
-echo  Checking internet ^(Preview CDN + Free Web Search^)...
-powershell -NoProfile -Command "try { $r = Invoke-WebRequest -Uri 'https://unpkg.com/react@18.2.0/umd/react.development.js' -Method Head -UseBasicParsing -TimeoutSec 8; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 400) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>&1
+
+echo [STEP 2/5] Checking Node.js runtime ^(v18+ required^)...
+call :detect_node
+if !NODE_MAJOR! GEQ 18 goto :node_ready
+
+echo   [WARN] Node.js 18+ was not found ^(detected: !NODE_VER!^).
+echo   [FIX]  Attempting automatic download ^& install of Node.js LTS via winget...
+
+where winget >nul 2>&1
 if errorlevel 1 (
-  echo  [!!] Internet unreachable — offline mode ^(live preview CDN & web search require internet^).
-) else (
-  echo  [OK] Internet reachable — Preview CDN & Free Web Search ready ^(zero API keys needed^)
+  call :add_error "ERR_NODE_MISSING" "App Runtime" "Node.js 18 or newer is required to run WebForge and its local UI library server, and winget is not available for auto-install." "Download and install Node.js LTS from https://nodejs.org , restart your terminal, and run start.bat again."
+  goto :error_section
 )
 
-REM ── 6) Check if port is already serving WebForge ──
-netstat -ano | findstr /R /C:":%PORT% .*LISTENING" >nul 2>&1
+winget install -e --id OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
+if errorlevel 1 (
+  call :add_error "ERR_NODE_AUTO_INSTALL" "App Runtime" "Automatic Node.js LTS installation via winget failed or was cancelled." "Download and install Node.js LTS manually from https://nodejs.org , then run start.bat again."
+  goto :error_section
+)
+
+REM Refresh PATH in current shell for newly installed Node.js
+if exist "%ProgramFiles%\nodejs\node.exe" set "PATH=%ProgramFiles%\nodejs;%PATH%"
+if exist "%LocalAppData%\Programs\nodejs\node.exe" set "PATH=%LocalAppData%\Programs\nodejs;%PATH%"
+
+call :detect_node
+if !NODE_MAJOR! LSS 18 (
+  call :add_error "ERR_NODE_PATH" "App Runtime" "Node.js LTS was installed, but this window could not detect Node.js 18+ yet." "Close this window and double-click start.bat again so Windows refreshes your PATH."
+  goto :error_section
+)
+
+echo   [FIXED] Node.js v!NODE_VER! installed and ready.
+
+:node_ready
+echo   [OK] Using Node.js v!NODE_VER!
+echo.
+
+echo [STEP 3/5] Verifying all app files, UI assets, Preview Kit ^& Watermelon UI Library...
+echo            ^(Missing or corrupted dependencies will be downloaded/repaired automatically.^)
+echo.
+node "tools\preflight-check.mjs" --repair
+if errorlevel 1 (
+  call :add_error "ERR_PREFLIGHT_FAILED" "Verification & Downloads" "One or more required files, UI dependencies, or Watermelon UI Library assets failed verification and could not be auto-repaired." "Review the detailed ERRORS section printed above [also saved to logs\startup-errors.log] and follow each Fix instruction."
+  goto :error_section
+)
+
+echo [STEP 4/5] Checking port %PORT%...
+set "PORT_BUSY=0"
+netstat -ano 2>nul | findstr /R /C:":%PORT% .*LISTENING" >nul 2>&1
+if not errorlevel 1 set "PORT_BUSY=1"
+
+if "%PORT_BUSY%"=="0" goto :start_server
+
+REM Port is already in use -- check whether WebForge is already running on it
+node -e "fetch('http://127.0.0.1:%PORT%/api/health').then(r=>r.ok?r.json():Promise.reject()).then(d=>process.exit(d&&d.ok?0:1)).catch(()=>process.exit(1))" >nul 2>&1
 if not errorlevel 1 (
-  echo.
-  echo  [OK] Port %PORT% is already running. Opening %URL%...
+  echo   [OK] WebForge Studio is already running at %URL%.
+  echo   Opening in your default browser...
   start "" "%URL%"
-  goto :done
+  echo.
+  echo   Done! You can close this window safely.
+  timeout /t 3 /nobreak >nul
+  exit /b 0
 )
 
+call :add_error "ERR_PORT_IN_USE" "Local Server" "Port %PORT% is already being used by another application on this PC." "Close the app using port %PORT%, or launch WebForge on another port by running: start.bat 3001"
+goto :error_section
+
+:start_server
+echo   [OK] Port %PORT% is available.
 echo.
-echo  ==========================================================
-echo   Starting WebForge Studio on %URL%
-echo   Server mode: %SERVER_MODE% ^(Zero-API-Key Web Search active^)
-echo  ==========================================================
-echo.
 
-if /i "%SERVER_MODE%"=="node" (
-  start "WebForge Studio Server" /Min cmd /c "node tools\serve.mjs %PORT%"
-) else (
-  start "WebForge Studio Server" /Min cmd /c "%PYTHON_CMD% -m http.server %PORT% --bind 127.0.0.1"
-)
+echo [STEP 5/5] Starting WebForge Studio server on %URL%...
+if not exist "logs" mkdir "logs" >nul 2>&1
+if exist "logs\server-stderr.log" del /f /q "logs\server-stderr.log" >nul 2>&1
 
-call :wait_for_server
-if errorlevel 1 (
-  echo  [FAIL] Server did not become ready in time.
-  goto :fail
-)
+start "WebForge Studio Server" /Min cmd /c "node tools\serve.mjs %PORT% 2>logs\server-stderr.log"
 
-echo  [OK] WebForge Studio is live!
-if /i "%SERVER_MODE%"=="node" (
-  powershell -NoProfile -Command "try { $h = Invoke-RestMethod -Uri '%HEALTH_URL%' -TimeoutSec 3; if ($h.webSearch) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>&1
+set "SERVER_READY=0"
+for /L %%I in (1,1,30) do (
+  node -e "fetch('http://127.0.0.1:%PORT%/api/health').then(r=>r.ok?r.json():Promise.reject()).then(d=>process.exit(d&&d.ok?0:1)).catch(()=>process.exit(1))" >nul 2>&1
   if not errorlevel 1 (
-    echo  [OK] Free Keyless Web Search ^(DuckDuckGo + Wikipedia + Web Index^) initialized automatically
+    set "SERVER_READY=1"
+    goto :server_online
   )
+  timeout /t 1 /nobreak >nul
 )
 
+:server_online
+if "%SERVER_READY%"=="0" (
+  call :add_error "ERR_SERVER_START" "Local Server" "WebForge Studio server did not respond on %URL%/api/health within 30 seconds." "Check the server error log below [logs\server-stderr.log] or try another port with: start.bat 3001"
+  goto :error_section
+)
+
+echo   [OK] WebForge Studio server is online and healthy!
+echo   Opening %URL% in your default browser...
 start "" "%URL%"
 echo.
-echo  Browser opened. Keep the minimized "WebForge Studio Server" window open while using WebForge.
+echo ==========================================================
+echo   WEBFORGE STUDIO IS RUNNING
+echo ==========================================================
+echo   URL    : %URL%
+echo   Server : Running in the minimized "WebForge Studio Server" window.
+echo   Stop   : Close that server window whenever you want to stop WebForge.
+echo ==========================================================
 echo.
-
-:done
-pause
+timeout /t 4 /nobreak >nul
 exit /b 0
 
-:require_file
-if not exist "%~1" (
-  echo  [FAIL] Missing required file: %~1
-  exit /b 1
+
+REM ==========================================================
+REM  HELPER SUBROUTINES
+REM ==========================================================
+
+:detect_node
+set "NODE_VER=none"
+set "NODE_MAJOR=0"
+where node >nul 2>&1
+if errorlevel 1 exit /b 0
+for /f "delims=" %%V in ('node -p "process.versions.node" 2^>nul') do set "NODE_VER=%%V"
+for /f "tokens=1 delims=." %%M in ("!NODE_VER!") do set "NODE_MAJOR=%%M"
+exit /b 0
+
+:add_error
+set /a ERR_COUNT+=1
+set "ERR_CODE_!ERR_COUNT!=%~1"
+set "ERR_CAT_!ERR_COUNT!=%~2"
+set "ERR_PROB_!ERR_COUNT!=%~3"
+set "ERR_FIX_!ERR_COUNT!=%~4"
+exit /b 0
+
+
+REM ==========================================================
+REM  PHASE 2: DEDICATED ERRORS SECTION
+REM ==========================================================
+
+:error_section
+echo.
+echo ==========================================================
+echo   ERRORS SECTION [!ERR_COUNT! error(s) prevented launch]
+echo ==========================================================
+for /L %%E in (1,1,!ERR_COUNT!) do (
+  echo.
+  echo   [%%E] !ERR_CODE_%%E! -- !ERR_CAT_%%E!
+  echo       Problem : !ERR_PROB_%%E!
+  echo       Fix     : !ERR_FIX_%%E!
 )
-exit /b 0
 
-:wait_for_server
-set /a _tries=0
-:wait_loop
-set /a _tries+=1
-powershell -NoProfile -Command "try { $r = Invoke-WebRequest -Uri '%URL%' -UseBasicParsing -TimeoutSec 2; exit 0 } catch { exit 1 }" >nul 2>&1
-if not errorlevel 1 exit /b 0
-if !_tries! GEQ 30 exit /b 1
-timeout /t 1 /nobreak >nul
-goto :wait_loop
+if exist "logs\server-stderr.log" (
+  for %%S in ("logs\server-stderr.log") do (
+    if %%~zS GTR 0 (
+      echo.
+      echo ----------------------------------------------------------
+      echo   SERVER ERROR LOG [logs\server-stderr.log]
+      echo ----------------------------------------------------------
+      type "logs\server-stderr.log"
+    )
+  )
+)
 
-:fail
+if exist "logs\startup-errors.log" (
+  echo.
+  echo   Detailed diagnostic report saved at: logs\startup-errors.log
+)
+
+echo.
+echo ==========================================================
+echo   WebForge did not launch. Fix the error(s) above and run start.bat again.
+echo ==========================================================
 echo.
 pause
 exit /b 1

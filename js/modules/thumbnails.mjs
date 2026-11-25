@@ -13,6 +13,7 @@ export const DEMO_THUMBNAIL_MAP = {
   'demo-kinetix-saas': '/assets/demos/saas-hero.jpg',
   'demo-maison-vera': '/assets/demos/vera-hero.jpg',
   'demo-valkyr-motors': '/assets/demos/valkyr-hero.jpg',
+  'demo-sola-ceramic': '/assets/demos/sola-hero.jpg',
 };
 
 const MAX_THUMB_BYTES = 120000;

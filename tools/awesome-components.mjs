@@ -322,7 +322,7 @@ export function formatJsxMarkup(markup = '', baseIndent = 6) {
  * Converts a Tailwind rendered HTML snapshot from awesome-components into a clean,
  * properly indented, self-contained React JSX component ready for WebForge's Live Preview.
  */
-export function htmlSnapshotToReactComponent(componentName = 'AwesomeComponent', renderedHtml = '') {
+export function htmlSnapshotToReactComponent(componentName = 'AwesomeComponent', renderedHtml = '', sourceRepo = 'wundercorp/awesome-components') {
   const pascal = String(componentName || 'AwesomeComponent')
     .replace(/[^a-zA-Z0-9]+/g, ' ')
     .trim()
@@ -448,7 +448,7 @@ export function htmlSnapshotToReactComponent(componentName = 'AwesomeComponent',
 
 /**
  * ${componentName}
- * Imported from wundercorp/awesome-components
+ * Imported from ${sourceRepo || 'wundercorp/awesome-components'}
  */
 export function ${pascal}() {
   return (

@@ -10,8 +10,9 @@ import { safeStorageGet, safeStorageJsonGet, safeStorageSet, STORAGE_KEYS } from
 import { DEMO_KINETIX_SAAS } from './demo-saas.mjs';
 import { DEMO_MAISON_VERA } from './demo-luxury.mjs';
 import { DEMO_VALKYR_CAR } from './demo-car.mjs';
+import { DEMO_SOLA_CERAMIC } from './demo-ceramic.mjs';
 
-export const DEMO_SEED_VERSION = 'flagship-v2.1';
+export const DEMO_SEED_VERSION = 'flagship-v2.2';
 
 export const LEGACY_DEMO_IDS = [
   'demo-petal-pop',
@@ -23,6 +24,7 @@ export const DEMO_PROJECTS = [
   DEMO_KINETIX_SAAS,
   DEMO_MAISON_VERA,
   DEMO_VALKYR_CAR,
+  DEMO_SOLA_CERAMIC,
 ];
 
 function removeProjectStorageKeys(projectId) {

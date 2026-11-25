@@ -39,7 +39,26 @@ import { listCheckpoints, createCheckpoint, getCheckpoint, deleteCheckpoint } fr
 import { seedDemoProjects } from './demos.mjs';
 import { PreviewManager } from './preview.mjs';
 import { PromptBuilder } from './prompt-builder.mjs';
+import { SectionSwapModalController } from './section-swap-modal.mjs';
+import { formatAttachedComponentsForPrompt } from './section-swap.mjs';
+import {
+  buildWatermelonStarterVfs,
+  buildWatermelonPromptBlueprint,
+  buildPageAssemblerBlueprint,
+} from './watermelon-ecosystem.mjs';
 import { createZipBlob, buildProjectExportFiles, downloadBlob } from './zip-export.mjs';
+import {
+  applyPopoverOrigin,
+  attachInteractiveCardTilt,
+  attachRubberBandScroll,
+  closeDialogFast,
+  computeStaggerDelayMs,
+  openDialogWithOrigin,
+  prefersReducedMotion,
+  syncSlidingTabIndicator,
+  triggerPeakEndBurst,
+} from './motion.mjs';
+import { hydrateKubaiIcons } from './kubai-icons.mjs';
 import {
   extractSearchQuery,
   shouldAutoRunWebSearch,
@@ -49,6 +68,7 @@ import {
 import { shouldUseSubAgents, runSubAgents } from './sub-agents.mjs';
 import { UILibraryManager } from './ui-library.mjs';
 import { UILibraryModalController } from './ui-library-modal.mjs';
+import { normalizeComponentRecord } from './ui-normalizer.mjs';
 import {
   DEMO_THUMBNAIL_MAP,
   getProjectThumbnail,
@@ -62,6 +82,16 @@ import {
   buildApprovedPlanExecutionPrompt,
   formatPlanMarkdownToHtml,
 } from './plan-mode.mjs';
+import {
+  computeTokenRingMetrics,
+  createActivityTurnState,
+  addOrUpdateActivityStep,
+  finalizeActivityTurn,
+  buildActivitySummary,
+  serializeTurnActivity,
+  hydrateTurnActivity,
+} from './agent-activity.mjs';
+import { SettingsController } from '../../src/components/settings/index.mjs';
 
 const GEN_JOB_MAX_AGE_MS = 45 * 60 * 1000;
 
@@ -124,6 +154,8 @@ export class WebForgeStudio {
     this.skillManager = new SkillManager();
     this.uiLibraryManager = new UILibraryManager();
     this.uiLibraryModal = new UILibraryModalController(this);
+    this.sectionSwapModal = new SectionSwapModalController(this);
+    this.settingsView = new SettingsController(this);
     this.preview = null;
     this.promptBuilder = null;
 
@@ -154,6 +186,8 @@ export class WebForgeStudio {
     this.mobilePane = 'chat'; // chat | stage
     this.homeAttachments = [];
     this.wsAttachments = [];
+    this.homeComponentAttachments = [];
+    this.wsComponentAttachments = [];
 
     this.isGenerating = false;
     this.skillsDockOpen = false;
@@ -171,7 +205,8 @@ export class WebForgeStudio {
     this.layoutPrefs = safeStorageJsonGet(STORAGE_KEYS.LAYOUT, {
       chatWidth: 420,
       devtoolsHeight: 220,
-    }) || { chatWidth: 420, devtoolsHeight: 220 };
+      homeSidebarCollapsed: false,
+    }) || { chatWidth: 420, devtoolsHeight: 220, homeSidebarCollapsed: false };
 
     const savedAgentPrefs = safeStorageJsonGet(STORAGE_KEYS.AGENT_PREFS, null);
     this.agentPrefs = {
@@ -181,6 +216,8 @@ export class WebForgeStudio {
     };
     this._subAgentAbort = null;
     this._pendingPlans = new Map();
+    this._activityTurns = new Map();
+    this._openActivityTurnId = null;
   }
 
   init() {
@@ -206,6 +243,32 @@ export class WebForgeStudio {
     this.promptBuilder = new PromptBuilder({
       onContinueToChat: (promptText) => this._handlePromptBuilderContinue(promptText),
       onToast: (msg, isErr) => this.showToast(msg, isErr),
+      getSkills: () => this.skillManager.skills,
+      toggleSkill: (id) => {
+        this.skillManager.toggle(id);
+        this._renderSkillsIndicator();
+        this._renderSkillsSettingsList();
+      },
+      getLibraries: () => this.uiLibraryManager.getVisibleLibraries(),
+      getUiLibraryManager: () => this.uiLibraryManager,
+      getActiveLibraryId: () => this.uiLibraryManager.activeLibraryId,
+      setActiveLibrary: (id) => {
+        this.uiLibraryManager.setActiveLibrary(id);
+        this.syncUiLibraryIndicators();
+      },
+      openUiLibraryForSlot: (slotMeta, onPick) => {
+        const preferredLib = this.uiLibraryManager.getLibrary('watermelon-ui')
+          ? 'watermelon-ui'
+          : (this.uiLibraryManager.getLibrary('kokonut-ui') ? 'kokonut-ui' : null);
+        this.uiLibraryModal.open(preferredLib, null, {
+          mode: 'pick-slot',
+          slotId: slotMeta?.id || '',
+          slotLabel: slotMeta?.label || 'Section',
+          blocksFirst: true,
+          onPickSlot: onPick,
+        });
+      },
+      onLaunchWatermelonStarter: (item) => this.loadWatermelonStarterProject(item),
     });
     window.promptBuilder = this.promptBuilder;
 
@@ -224,11 +287,21 @@ export class WebForgeStudio {
     this._applyLayoutPrefs();
     this._syncAgentPrefsUI();
     this.syncUiLibraryIndicators();
+    const fallbackNotice = this.uiLibraryManager?.consumeActiveLibraryFallbackNotice?.();
+    if (fallbackNotice?.message) {
+      setTimeout(() => this.showToast(fallbackNotice.message), 250);
+    }
+    this.uiLibraryManager?.fetchPreviewKitStatus?.().then(() => {
+      this.syncUiLibraryIndicators();
+    });
+    attachRubberBandScroll(document.getElementById('agentActivityBody'));
+    attachRubberBandScroll(document.querySelector('.home-sidebar-nav'));
 
     window.addEventListener('pagehide', () => this._flushGenCheckpoint());
     window.addEventListener('beforeunload', (e) => this._onBeforeUnloadDuringGen(e));
 
     this.showHomeView();
+    this.settingsView.init();
     requestAnimationFrame(() => this._ensureHomeOnLaunch());
   }
 
@@ -309,11 +382,11 @@ export class WebForgeStudio {
     });
     const homeSendLbl = document.getElementById('homeSendBtnLabel');
     if (homeSendLbl) {
-      homeSendLbl.textContent = enabled ? 'Create plan' : 'Build now';
+      homeSendLbl.textContent = enabled ? 'Create plan' : 'Build';
     }
     const homeSendBtn = document.getElementById('homeSendBtn');
     if (homeSendBtn) {
-      homeSendBtn.setAttribute('aria-label', enabled ? 'Create implementation plan' : 'Build now');
+      homeSendBtn.setAttribute('aria-label', enabled ? 'Create implementation plan' : 'Build');
     }
     const homeInput = document.getElementById('homePromptInput');
     if (homeInput) {
@@ -358,11 +431,26 @@ export class WebForgeStudio {
     const btn = document.getElementById(isHome ? 'btnHomeToolsMenu' : 'btnWsToolsMenu');
     if (!pop || !btn) return;
     const shouldOpen = typeof force === 'boolean' ? force : pop.classList.contains('hidden');
+    applyPopoverOrigin(pop, btn);
     pop.classList.toggle('hidden', !shouldOpen);
     btn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
     if (shouldOpen) {
       this._syncAgentPrefsUI();
       this._safeCreateIcons(pop);
+    }
+  }
+
+  toggleToolbarMoreMenu(which, force) {
+    const isTopbar = which === 'topbar';
+    const menu = document.getElementById(isTopbar ? 'topbarMoreMenu' : 'wsToolbarMoreMenu');
+    const btn = document.getElementById(isTopbar ? 'btnTopbarMore' : 'btnWsToolbarMore');
+    if (!menu || !btn) return;
+    const shouldOpen = typeof force === 'boolean' ? force : menu.classList.contains('hidden');
+    applyPopoverOrigin(menu, btn);
+    menu.classList.toggle('hidden', !shouldOpen);
+    btn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+    if (shouldOpen) {
+      this._safeCreateIcons(menu);
     }
   }
 
@@ -383,6 +471,7 @@ export class WebForgeStudio {
   // ── Icons & Toast ──
 
   _safeCreateIcons(root) {
+    hydrateKubaiIcons(root);
     if (typeof window.lucide === 'undefined') return;
     try {
       if (root) window.lucide.createIcons({ root });
@@ -392,14 +481,36 @@ export class WebForgeStudio {
     }
   }
 
-  showToast(msg, isError = false) {
+  _triggerViewEnter(el) {
+    if (!el || prefersReducedMotion()) return;
+    el.classList.remove('wf-view-enter');
+    void el.offsetWidth;
+    el.classList.add('wf-view-enter');
+  }
+
+  showToast(msg, isError = false, options = {}) {
     const el = document.getElementById('toast');
     if (!el) return;
-    el.textContent = msg;
+    const text = String(msg || '');
+    const isSuccessMilestone =
+      !isError &&
+      (options.celebrate === true ||
+        /\b(imported|saved|applied|activated|downloaded|restored|created|ready|added|connected|copied|enabled|reverted)\b/i.test(text));
+
+    if (isSuccessMilestone) {
+      el.innerHTML = `<span class="toast-check-wrap" aria-hidden="true"><svg class="toast-check-svg" viewBox="0 0 18 18" fill="none"><circle class="toast-check-ring" cx="9" cy="9" r="7.5"/><path class="toast-check-path" d="M5.5 9.3 7.9 11.7 12.7 6.7"/></svg></span><span class="toast-text">${escapeHtml(text)}</span>`;
+    } else {
+      el.textContent = text;
+    }
+
     el.classList.toggle('is-error', !!isError);
+    el.classList.toggle('is-success', isSuccessMilestone);
+    el.classList.remove('show');
+    // Force reflow only when re-triggering draw-in check or error shake
+    void el.offsetWidth;
     el.classList.add('show');
     clearTimeout(this._toastTimer);
-    this._toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+    this._toastTimer = setTimeout(() => el.classList.remove('show'), isError ? 3400 : 2700);
   }
 
   // ── Projects & Views ──
@@ -428,13 +539,25 @@ export class WebForgeStudio {
     this.dirtyFiles.clear();
     this._updateUnsavedBar();
     this.setHomeDrawerOpen(false);
+    this.closeActivityDrawer();
+
+    if (this.settingsView?.isOpen) {
+      this.settingsView.isOpen = false;
+      const sv = document.getElementById('settingsView');
+      if (sv) sv.hidden = true;
+      if (typeof history !== 'undefined' && location.pathname.startsWith('/settings')) {
+        try { history.pushState({}, '', '/'); } catch {}
+      }
+    }
 
     this._renderHomeProjects();
     this._updateHomeStatusStrip();
     const home = document.getElementById('homeView');
     const ws = document.getElementById('workspaceView');
+    const wasHidden = home && home.style.display === 'none';
     if (home) home.style.display = 'flex';
     if (ws) ws.style.display = 'none';
+    if (wasHidden) this._triggerViewEnter(home);
     this._safeCreateIcons();
   }
 
@@ -445,15 +568,77 @@ export class WebForgeStudio {
   }
 
   showWorkspaceView() {
+    if (this.settingsView?.isOpen) {
+      this.settingsView.isOpen = false;
+      const sv = document.getElementById('settingsView');
+      if (sv) {
+        sv.classList.remove('is-open', 'is-closing');
+        sv.hidden = true;
+      }
+      if (typeof history !== 'undefined' && location.pathname.startsWith('/settings')) {
+        try { history.pushState({}, '', '/'); } catch {}
+      }
+    }
     if (this._thumbObserver) {
       this._thumbObserver.disconnect();
       this._thumbObserver = null;
     }
     const home = document.getElementById('homeView');
     const ws = document.getElementById('workspaceView');
+    const wasHidden = ws && (ws.style.display === 'none' || !ws.style.display);
     if (home) home.style.display = 'none';
     if (ws) ws.style.display = 'flex';
+    if (wasHidden) this._triggerViewEnter(ws);
     this._updateMobilePaneUI();
+  }
+
+  toggleHomeModelPopover(force) {
+    const pop = document.getElementById('homeModelPopover');
+    const btn = document.getElementById('homeModelBtn');
+    if (!pop || !btn) return;
+    const nextOpen = typeof force === 'boolean' ? force : pop.hidden;
+    if (nextOpen) this._renderHomeModelPopover();
+    pop.hidden = !nextOpen;
+    btn.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+    if (nextOpen) this._safeCreateIcons(pop);
+  }
+
+  _renderHomeModelPopover() {
+    const list = document.getElementById('homeModelPopoverList');
+    if (!list) return;
+    const allModels = this.provider.getAllAvailableModels();
+    const activeProviderId = this.provider.type;
+    const activeModelId = this.provider.model;
+
+    if (!allModels.length) {
+      list.innerHTML = `<div class="home-model-pop-empty">No models loaded yet. Open provider settings to fetch or add models.</div>`;
+      return;
+    }
+
+    list.innerHTML = allModels.map((item) => {
+      const isSelected = item.providerId === activeProviderId && item.id === activeModelId;
+      const shortName = item.name || item.id;
+      return `
+        <button type="button" class="home-model-pop-item ${isSelected ? 'active' : ''}" role="menuitemradio" aria-checked="${isSelected ? 'true' : 'false'}" data-pop-provider="${escapeHtml(item.providerId)}" data-pop-model="${escapeHtml(item.id)}">
+          <span class="home-model-pop-item-copy">
+            <span class="home-model-pop-item-name truncate">${escapeHtml(shortName)}</span>
+            <span class="home-model-pop-item-provider truncate">${escapeHtml(item.providerName)}</span>
+          </span>
+          ${isSelected ? '<i data-lucide="check" class="home-model-pop-check"></i>' : ''}
+        </button>`;
+    }).join('');
+
+    list.querySelectorAll('[data-pop-model]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const providerId = btn.dataset.popProvider;
+        const modelId = btn.dataset.popModel;
+        this.provider.setRoleModel('build', modelId, providerId);
+        this._updateConnectionStatus();
+        this._updateHomeStatusStrip();
+        this._updateContextBudgetMeter();
+        this.toggleHomeModelPopover(false);
+      });
+    });
   }
 
   setHomeDrawerOpen(open) {
@@ -463,20 +648,41 @@ export class WebForgeStudio {
     if (backdrop) backdrop.classList.toggle('open', !!open);
   }
 
+  toggleHomeSidebar(force) {
+    const nextCollapsed = typeof force === 'boolean' ? force : !Boolean(this.layoutPrefs.homeSidebarCollapsed);
+    this.layoutPrefs.homeSidebarCollapsed = nextCollapsed;
+    safeStorageSet(STORAGE_KEYS.LAYOUT, JSON.stringify(this.layoutPrefs));
+    this._applyHomeSidebarState();
+  }
+
+  _applyHomeSidebarState() {
+    const homeView = document.getElementById('homeView');
+    const collapsed = Boolean(this.layoutPrefs.homeSidebarCollapsed);
+    if (homeView) homeView.classList.toggle('sidebar-collapsed', collapsed);
+    const collapseBtn = document.getElementById('btnCollapseHomeSidebar');
+    const expandBtn = document.getElementById('btnExpandHomeSidebar');
+    if (collapseBtn) collapseBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    if (expandBtn) expandBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  }
+
   _updateHomeStatusStrip() {
     const modelLabel = document.getElementById('homeModelLabel');
     const shortModelText = this.provider.model
       ? this.provider.model.split('/').pop()
       : 'Select model';
+    const fullModelText = this.provider.model
+      ? `${this.provider.preset.name} · ${shortModelText}`
+      : `${this.provider.preset.name} · Select model`;
     if (modelLabel) {
       modelLabel.textContent = this.provider.model
         ? `${this.provider.preset.name} · ${this.provider.model}`
         : `${this.provider.preset.name} · Select model`;
     }
-    const composerModelLabel = document.getElementById('homeComposerModelLabel');
-    if (composerModelLabel) {
-      composerModelLabel.textContent = shortModelText;
-    }
+    ['homePopoverModelName', 'wsPopoverModelName'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = fullModelText;
+    });
+
     const promptVal = document.getElementById('homePromptInput')?.value || '';
     const uiGuide = this.uiLibraryManager?.buildPromptGuide() || '';
     const sysPrompt = uiGuide ? `${this.skillManager.getSystemPrompt()}\n\n${uiGuide}` : this.skillManager.getSystemPrompt();
@@ -486,9 +692,30 @@ export class WebForgeStudio {
       attachments: this.homeAttachments,
       contextWindow: this.provider.contextWindow,
     });
-    const tokenEl = document.getElementById('homeTokenHint');
-    if (tokenEl) {
-      tokenEl.textContent = `${budget.total.toLocaleString()} / ${budget.limit.toLocaleString()} tok`;
+    const ring = computeTokenRingMetrics(budget.total, budget.limit);
+    const ringBtn = document.getElementById('homeTokenRingBtn');
+    const ringCircle = document.getElementById('homeTokenRingCircle');
+    const tooltip = document.getElementById('homeTokenTooltip');
+    if (ringBtn) {
+      ringBtn.dataset.level = ring.level;
+      ringBtn.setAttribute('aria-label', `Context token usage: ${ring.percent}% (${ring.detailLabel})`);
+    }
+    if (ringCircle) {
+      ringCircle.setAttribute('stroke-dasharray', String(ring.circumference));
+      ringCircle.setAttribute('stroke-dashoffset', String(ring.strokeDashoffset));
+    }
+    if (tooltip) {
+      tooltip.innerHTML = `
+        <div class="ctx-pop-head">
+          <span>Context Usage</span>
+          <strong class="tabular-nums">${ring.percent}%</strong>
+        </div>
+        <div class="ctx-pop-total tabular-nums">${ring.detailLabel}</div>
+        <div class="ctx-pop-divider"></div>
+        <div class="ctx-pop-row"><span>System &amp; Skills</span><span class="tabular-nums">${budget.breakdown.system.toLocaleString()}</span></div>
+        <div class="ctx-pop-row"><span>Current Prompt</span><span class="tabular-nums">${budget.breakdown.prompt.toLocaleString()}</span></div>
+        ${budget.breakdown.images ? `<div class="ctx-pop-row"><span>Images (${this.homeAttachments.length})</span><span class="tabular-nums">${budget.breakdown.images.toLocaleString()}</span></div>` : ''}
+      `;
     }
   }
 
@@ -607,7 +834,7 @@ export class WebForgeStudio {
       return;
     }
 
-    grid.innerHTML = filtered.map((p) => {
+    grid.innerHTML = filtered.map((p, idx) => {
       const ago = timeAgo(p.updatedAt);
       let fileCount = 0;
       const vfs = safeStorageJsonGet(`wf_vfs_${p.id}`, null);
@@ -616,6 +843,7 @@ export class WebForgeStudio {
       const safeId = escapeHtml(p.id);
       const icon = escapeHtml(p.icon || 'code-2');
       const thumbSrc = getProjectThumbnail(p.id);
+      const staggerMs = computeStaggerDelayMs(idx, { stepMs: 40, maxTotalMs: 280 });
 
       const thumbMarkup = thumbSrc
         ? `<img src="${escapeHtml(thumbSrc)}" alt="${safeName} preview" loading="lazy" />`
@@ -627,7 +855,7 @@ export class WebForgeStudio {
            </div>`;
 
       return `
-        <article class="home-project-card" data-project-id="${safeId}">
+        <article class="home-project-card wf-stagger-in" data-project-id="${safeId}" style="--wf-stagger:${staggerMs}ms">
           <button type="button" class="home-card-open" data-action="open-project" aria-label="Open ${safeName}">
             <div class="home-card-thumb">
               ${thumbMarkup}
@@ -658,6 +886,7 @@ export class WebForgeStudio {
 
     grid.querySelectorAll('.home-project-card').forEach((card) => {
       const id = card.dataset.projectId;
+      attachInteractiveCardTilt(card, { maxTilt: 4.5 });
       card.querySelector('[data-action="open-project"]')?.addEventListener('click', () => this.openProject(id));
       card.querySelector('[data-action="open-project-title"]')?.addEventListener('click', () => this.openProject(id));
       card.querySelector('[data-action="rename-project"]')?.addEventListener('click', (e) => {
@@ -745,6 +974,7 @@ export class WebForgeStudio {
     safeStorageSet(STORAGE_KEYS.LAST_PROJECT, projectId);
 
     this.turnBaselines = {};
+    this.closeActivityDrawer();
     this.openTabs = [];
     this.draftFiles = {};
     this.dirtyFiles.clear();
@@ -898,22 +1128,30 @@ export class WebForgeStudio {
   sendHomePrompt() {
     const input = document.getElementById('homePromptInput');
     const msg = (input?.value || '').trim();
-    if (!msg && !this.homeAttachments.length) return;
+    if (!msg && !this.homeAttachments.length && !this.homeComponentAttachments.length) return;
+    triggerPeakEndBurst(document.getElementById('homeSendBtn'));
     if (input) {
       input.value = '';
       input.style.height = 'auto';
     }
 
     const attachments = this.homeAttachments.slice();
+    const compAttachments = this.homeComponentAttachments.slice();
     this.homeAttachments = [];
+    this.homeComponentAttachments = [];
     this._renderAttachments('home');
 
     this.createNewProject();
     this.wsAttachments = attachments;
+    this.wsComponentAttachments = compAttachments;
     this._renderAttachments('ws');
 
     const chatInput = document.getElementById('chatInput');
-    if (chatInput) chatInput.value = msg || 'Build a web app matching the attached screenshot design.';
+    if (chatInput) {
+      chatInput.value = msg || (compAttachments.length
+        ? `Build a polished web app incorporating the attached ${compAttachments.map((c) => `"${c.name}"`).join(', ')} UI component${compAttachments.length === 1 ? '' : 's'}.`
+        : 'Build a web app matching the attached screenshot design.');
+    }
     requestAnimationFrame(() => this.sendChatMessage());
   }
 
@@ -1361,45 +1599,29 @@ export class WebForgeStudio {
   }
 
   _appendVersionCardInChat({ title, meta, fileDiffs = [], checkpoint = null, revertLabel = 'Revert to Before Edit' }) {
-    const fileRows = fileDiffs.length
-      ? `<div class="turn-files-list">
-          ${fileDiffs.map((d) => `
-            <div class="turn-file-row" data-file-path="${escapeHtml(d.path)}">
-              <span class="turn-file-name truncate">${escapeHtml(d.path)}</span>
-              <span class="turn-file-stats tabular-nums">
-                ${d.added ? `<span class="diff-stat-add">+${d.added}</span>` : ''}
-                ${d.removed ? `<span class="diff-stat-del">-${d.removed}</span>` : ''}
-              </span>
-              <button type="button" class="turn-file-btn" data-turn-action="open">Open</button>
-              <button type="button" class="turn-file-btn" data-turn-action="diff" data-cp-id="${escapeHtml(checkpoint?.id || 'latest')}">Diff</button>
-            </div>`).join('')}
-        </div>`
-      : '';
+    const turnId = `turn-action-${generateId()}`;
+    const turn = createActivityTurnState({ turnId, mode: 'KIT', prompt: title });
+    turn.steps = [
+      { key: 'apply', label: title, codeLabel: '', status: 'done' },
+      ...fileDiffs.slice(0, 6).map((d, idx) => ({
+        key: `file-${idx}`,
+        label: 'Updated',
+        codeLabel: d.path,
+        status: 'done',
+      })),
+    ];
+    finalizeActivityTurn(turn, {
+      status: 'done',
+      headline: title,
+      elapsedSec: '0.1',
+      files: fileDiffs,
+      checkpointId: checkpoint?.id || '',
+      hasBeforeFiles: Boolean(checkpoint?.beforeFiles),
+    });
+    turn.revertLabel = revertLabel || 'Revert to Before Turn';
+    this._activityTurns.set(turnId, turn);
 
-    const html = `
-      <div class="agent-turn-card done">
-        <div class="agent-turn-head">
-          <span class="agent-status-indicator done" aria-hidden="true"></span>
-          <span class="gen-status-title">${escapeHtml(title)}</span>
-          <span class="gen-status-meta tabular-nums">${escapeHtml(meta)}</span>
-        </div>
-        ${fileRows}
-        <div class="turn-cp-bar">
-          <span>Saved version snapshot</span>
-          <div class="turn-cp-actions">
-            ${checkpoint?.beforeFiles
-              ? `<button type="button" class="turn-file-btn turn-revert-btn" data-turn-action="revert-before-cp" data-cp-id="${escapeHtml(checkpoint.id)}">
-                   <i data-lucide="rotate-ccw"></i> ${escapeHtml(revertLabel)}
-                 </button>`
-              : ''}
-            ${checkpoint
-              ? `<button type="button" class="turn-file-btn" data-turn-action="restore-cp" data-cp-id="${escapeHtml(checkpoint.id)}">Restore This Version</button>`
-              : ''}
-          </div>
-        </div>
-      </div>`;
-
-    this._addMessageBubble('ai', html);
+    this._addMessageBubble('ai', this._renderLovableCardHtml(turn));
     this._saveChatHistory();
   }
 
@@ -2161,19 +2383,7 @@ export class WebForgeStudio {
   // ── System Instructions & Skills Drawer ──
 
   openSystemDrawer() {
-    const baseEl = document.getElementById('sysBaseInstructions');
-    const projGroup = document.getElementById('sysProjectGroup');
-    const projEl = document.getElementById('sysProjectInstructions');
-    const activeProj = this._getActiveProject();
-
-    if (baseEl) baseEl.value = this.skillManager.baseInstructions;
-    if (projGroup && projEl) {
-      projGroup.classList.toggle('hidden', !activeProj);
-      projEl.value = activeProj?.customInstructions || '';
-    }
-    this._renderSystemDrawerSkills();
-    this._updateSystemDrawerPreview();
-    document.getElementById('systemDrawerModal')?.showModal();
+    this.settingsView?.open('system-instructions');
   }
 
   _renderSystemDrawerSkills() {
@@ -2303,27 +2513,210 @@ export class WebForgeStudio {
     this._updateHomeStatusStrip();
   }
 
+  attachUiComponentToChat(target = 'ws', lib = null, element = null) {
+    if (!lib || !element) return;
+    const resolvedTarget = target === 'home' ? 'home' : 'ws';
+    const list = resolvedTarget === 'home' ? this.homeComponentAttachments : this.wsComponentAttachments;
+    const key = `${lib.id}::${element.id || element.name}`;
+
+    // Step 6: Never attach a failed component
+    const rawStatus = element.verificationStatus || element.status || '';
+    if (rawStatus === 'failed') {
+      const code = element.reasonCode ? ` (${element.reasonCode})` : '';
+      this.showToast(`Cannot attach "${element.name || 'component'}": failed verification${code}`, true);
+      return;
+    }
+
+    if (list.some((item) => item.key === key)) {
+      this.showToast(`"${element.name}" is already attached`);
+      return;
+    }
+    if (list.length >= 4) {
+      this.showToast('Maximum 4 UI component attachments per message', true);
+      return;
+    }
+
+    const normalized = element.manifest
+      ? element
+      : normalizeComponentRecord(element, { libraryId: lib.id });
+
+    if (normalized.status === 'failed') {
+      const code = normalized.reasonCode ? ` (${normalized.reasonCode})` : '';
+      this.showToast(`Cannot attach "${element.name || 'component'}": ${normalized.reasonMessage || 'failed verification'}${code}`, true);
+      return;
+    }
+
+    const swatch = lib.swatches?.[2] || lib.swatches?.[0] || '#F59E0B';
+    const attachment = {
+      id: generateId(),
+      key,
+      componentId: String(element.id || element.name || ''),
+      libraryId: String(lib.id || ''),
+      libraryName: String(lib.name || lib.id || 'UI Library'),
+      librarySwatch: swatch,
+      name: String(element.name || normalized.title || 'Component'),
+      category: String(element.category || normalized.category || 'component'),
+      description: String(element.description || normalized.description || '').trim(),
+      status: rawStatus || normalized.status || 'verified',
+      hash: String(element.hash || normalized.hash || ''),
+      code: String(
+        normalized.code ||
+        element.code ||
+        element.jsxCode ||
+        element.htmlCode ||
+        element.renderedHtml ||
+        element.previewHtml ||
+        ''
+      ).trim(),
+      renderedHtml: String(element.renderedHtml || normalized.renderedHtml || '').trim(),
+      manifest: normalized.manifest || { dependencies: {}, tailwindVersion: 4, css: '', keyframes: [] },
+      usageNotes: String(element.usageNotes || normalized.usageNotes || '').trim(),
+    };
+    list.push(attachment);
+
+    // Track attached manifest on active project so ZIP export merges pinned deps cleanly
+    const activeProj = this._getActiveProject?.();
+    if (activeProj && attachment.manifest) {
+      if (!Array.isArray(activeProj.attachedManifests)) activeProj.attachedManifests = [];
+      activeProj.attachedManifests.push(attachment.manifest);
+      this._saveProjects?.();
+    }
+
+    this._renderAttachments(resolvedTarget);
+    this._updateContextBudgetMeter();
+    this._updateHomeStatusStrip();
+    this.showToast(`Attached "${attachment.name}" (${lib.name}) to chat`);
+
+    const inputEl = document.getElementById(resolvedTarget === 'home' ? 'homePromptInput' : 'chatInput');
+    if (inputEl) {
+      inputEl.focus();
+    }
+  }
+
+  toggleWatermelonResourceSkill(skillDef) {
+    if (!skillDef?.id || !this.skillManager?.toggleExternalSkill) return;
+    const { enabled } = this.skillManager.toggleExternalSkill(skillDef);
+    this._renderSkillsIndicator();
+    this._renderSkillsSettingsList();
+    this.promptBuilder?.syncStudioState?.();
+    this.showToast(
+      enabled
+        ? `Enabled "${skillDef.name}" as an active AI Skill`
+        : `Disabled "${skillDef.name}" AI Skill`
+    );
+  }
+
+  loadWatermelonStarterProject(item) {
+    if (!item) return;
+    const vfs = buildWatermelonStarterVfs(item);
+    const kindLabel = item.wfCollection === 'templates' ? 'Template' : 'Dashboard';
+    const cleanName = String(item.name || 'Watermelon Starter').trim();
+    const newProj = {
+      id: generateId(),
+      name: cleanName,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      pinnedFiles: ['index.html', 'src/App.jsx'],
+      customInstructions: `Built from Watermelon UI ${kindLabel} starter: ${cleanName}. Preserve its clean dark architectural layout, 1px borders, tabular numbers, and responsive grid while customizing copy, data, and interactive views as requested.`,
+    };
+    this.projectsList.unshift(newProj);
+    this._saveProjects();
+    safeStorageSet(`wf_vfs_${newProj.id}`, JSON.stringify(vfs), newProj.id);
+
+    const uiModal = document.getElementById('uiLibraryModal');
+    if (uiModal?.open) uiModal.close();
+    const pbModal = document.getElementById('promptBuilderModal');
+    if (pbModal?.open) pbModal.close();
+
+    this.openProject(newProj.id);
+    this.showToast(`Loaded Watermelon ${kindLabel} starter "${cleanName}" — ready to edit or customize with AI`);
+
+    const chatInput = document.getElementById('chatInput');
+    if (chatInput && !chatInput.value.trim()) {
+      chatInput.placeholder = `Customize "${cleanName}" (e.g., rename brand, swap KPI metrics, add a new tab)…`;
+    }
+    return newProj;
+  }
+
+  openPromptStudioWithWatermelonStarter(item) {
+    if (!item) return;
+    const uiModal = document.getElementById('uiLibraryModal');
+    if (uiModal?.open) uiModal.close();
+    const bp = buildWatermelonPromptBlueprint(item);
+    this.openPromptBuilderModal();
+    this.promptBuilder?.applyCustomBlueprint?.(bp);
+    this.promptBuilder?.goToStep?.(1);
+  }
+
+  loadAssembledBlocksIntoPromptStudio(blocks = []) {
+    if (!Array.isArray(blocks) || !blocks.length) return;
+    const uiModal = document.getElementById('uiLibraryModal');
+    if (uiModal?.open) uiModal.close();
+    this.openPromptBuilderModal();
+    this.promptBuilder?.loadBlocksIntoSlots?.(blocks);
+  }
+
+  attachPageAssemblerToChat(blocks = []) {
+    if (!Array.isArray(blocks) || !blocks.length) return;
+    const blueprint = buildPageAssemblerBlueprint(blocks);
+    const wmLib = this.uiLibraryManager.getLibrary('watermelon-ui') || {
+      id: 'watermelon-ui',
+      name: 'Watermelon UI',
+      swatches: ['#09090B', '#18181B', '#10B981', '#FAFAFA'],
+    };
+    const isWorkspace = Boolean(
+      this.activeProjectId && document.getElementById('workspaceView')?.classList.contains('active')
+    );
+    const target = isWorkspace ? 'ws' : 'home';
+    const namesSummary = blocks.map((b) => b.name).slice(0, 3).join(' → ');
+    const suffix = blocks.length > 3 ? ` +${blocks.length - 3}` : '';
+    this.attachUiComponentToChat(target, wmLib, {
+      id: `wm-assembler-${Date.now()}`,
+      name: `Page Blueprint (${blocks.length} Blocks)`,
+      category: 'blocks',
+      description: `Ordered Watermelon UI page assembly: ${namesSummary}${suffix}`,
+      code: blueprint,
+    });
+  }
+
   _renderAttachments(target) {
     const row = document.getElementById(target === 'home' ? 'homeAttachmentsRow' : 'wsAttachmentsRow');
-    const arr = target === 'home' ? this.homeAttachments : this.wsAttachments;
+    const imgArr = target === 'home' ? this.homeAttachments : this.wsAttachments;
+    const compArr = target === 'home' ? this.homeComponentAttachments : this.wsComponentAttachments;
     if (!row) return;
-    if (!arr.length) {
+    if (!imgArr.length && !compArr.length) {
       row.classList.add('hidden');
       row.innerHTML = '';
       return;
     }
     row.classList.remove('hidden');
-    row.innerHTML = arr.map((img) => `
-      <div class="attachment-chip" data-att-id="${escapeHtml(img.id)}">
+    const imgChips = imgArr.map((img) => `
+      <div class="attachment-chip" data-att-kind="image" data-att-id="${escapeHtml(img.id)}">
         <img src="${escapeHtml(img.dataUrl)}" alt="${escapeHtml(img.name)}">
         <span class="truncate">${escapeHtml(img.name)}</span>
         <button type="button" class="attachment-remove" aria-label="Remove ${escapeHtml(img.name)}"><i data-lucide="x"></i></button>
       </div>
     `).join('');
 
+    const compChips = compArr.map((comp) => `
+      <div class="attachment-chip attachment-chip-ui" data-att-kind="component" data-att-id="${escapeHtml(comp.id)}" title="${escapeHtml(comp.name)} · ${escapeHtml(comp.libraryName)}">
+        <span class="att-ui-dot" style="background:${escapeHtml(comp.librarySwatch || '#F59E0B')}" aria-hidden="true"></span>
+        <span class="att-ui-copy">
+          <strong class="att-ui-name truncate">${escapeHtml(comp.name)}</strong>
+          <small class="att-ui-lib truncate">${escapeHtml(comp.libraryName)}</small>
+        </span>
+        <button type="button" class="attachment-remove" aria-label="Remove ${escapeHtml(comp.name)}"><i data-lucide="x"></i></button>
+      </div>
+    `).join('');
+
+    row.innerHTML = imgChips + compChips;
+
     row.querySelectorAll('.attachment-chip').forEach((chip) => {
       chip.querySelector('.attachment-remove')?.addEventListener('click', () => {
-        const list = target === 'home' ? this.homeAttachments : this.wsAttachments;
+        const kind = chip.dataset.attKind;
+        const list = kind === 'component'
+          ? (target === 'home' ? this.homeComponentAttachments : this.wsComponentAttachments)
+          : (target === 'home' ? this.homeAttachments : this.wsAttachments);
         const idx = list.findIndex((x) => x.id === chip.dataset.attId);
         if (idx >= 0) list.splice(idx, 1);
         this._renderAttachments(target);
@@ -2362,16 +2755,24 @@ export class WebForgeStudio {
       contextWindow: this.provider.contextWindow,
     });
 
-    const barFill = document.getElementById('contextMeterFill');
-    const textEl = document.getElementById('contextMeterText');
+    const ring = computeTokenRingMetrics(budget.total, budget.limit);
+    const ringCircle = document.getElementById('wsTokenRingCircle');
     const popover = document.getElementById('contextBudgetPopover');
 
-    meter.dataset.level = budget.level;
-    if (barFill) barFill.style.width = `${Math.min(100, budget.percent)}%`;
-    if (textEl) textEl.textContent = `${budget.percent}% · ${budget.total.toLocaleString()} / ${budget.limit.toLocaleString()} tok`;
+    meter.dataset.level = ring.level;
+    meter.setAttribute('aria-label', `Context window usage: ${ring.percent}% (${ring.detailLabel})`);
+    if (ringCircle) {
+      ringCircle.setAttribute('stroke-dasharray', String(ring.circumference));
+      ringCircle.setAttribute('stroke-dashoffset', String(ring.strokeDashoffset));
+    }
     if (popover) {
       popover.innerHTML = `
-        <div class="ctx-pop-title">Context Window Breakdown</div>
+        <div class="ctx-pop-head">
+          <span>Context Window</span>
+          <strong class="tabular-nums">${ring.percent}%</strong>
+        </div>
+        <div class="ctx-pop-total tabular-nums">${ring.detailLabel}</div>
+        <div class="ctx-pop-divider"></div>
         <div class="ctx-pop-row"><span>System &amp; Skills</span><span class="tabular-nums">${budget.breakdown.system.toLocaleString()}</span></div>
         <div class="ctx-pop-row"><span>Codebase (${(proj?.pinnedFiles || []).length} pinned)</span><span class="tabular-nums">${budget.breakdown.files.toLocaleString()}</span></div>
         <div class="ctx-pop-row"><span>Chat History</span><span class="tabular-nums">${budget.breakdown.history.toLocaleString()}</span></div>
@@ -2428,13 +2829,16 @@ export class WebForgeStudio {
   }
 
   _ensureHomeOnLaunch() {
-    this.showHomeView();
+    if (this.settingsView?.isOpen || (typeof location !== 'undefined' && location.pathname.startsWith('/settings'))) {
+      return;
+    }
     this._setRetryAvailable(false);
     const job = this._loadGenJob();
     const fresh = job && job.status === 'running' && job.projectId && job.userMessage
       && (Date.now() - (job.updatedAt || job.startedAt || 0)) < GEN_JOB_MAX_AGE_MS
       && this.projectsList.some((p) => p.id === job.projectId);
     if (fresh) {
+      this.showHomeView();
       if ((job.resumeCount || 0) >= 3) {
         this._clearGenJob();
         return;
@@ -2442,9 +2846,27 @@ export class WebForgeStudio {
       this._lastFailedJob = job;
       const proj = this.projectsList.find((p) => p.id === job.projectId);
       this.showToast(proj ? `Unfinished build in "${proj.name}" — open to Retry` : 'Unfinished build saved — tap Retry');
+      return;
     } else if (job?.status === 'running') {
       this._clearGenJob();
     }
+
+    const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const requestedProject = params?.get('project');
+    if (requestedProject && this.projectsList.some((p) => p.id === requestedProject)) {
+      this.openProject(requestedProject);
+      return;
+    }
+
+    const solaId = 'demo-sola-ceramic';
+    const hasAutoOpenedSola = safeStorageGet('wf_sola_showcase_opened', '') === '1';
+    if (!hasAutoOpenedSola && this.projectsList.some((p) => p.id === solaId)) {
+      safeStorageSet('wf_sola_showcase_opened', '1');
+      this.openProject(solaId);
+      return;
+    }
+
+    this.showHomeView();
   }
 
   // ── True Plan Mode (Draft → Edit → Approve & Build) ──
@@ -2452,15 +2874,20 @@ export class WebForgeStudio {
   async _runPlanModeTurn(finalMsg) {
     const input = document.getElementById('chatInput');
     const attachments = this.wsAttachments.slice();
+    const componentAttachments = this.wsComponentAttachments.slice();
     const attHtml = attachments.length
       ? `<div class="msg-attachments">${attachments.map((a) => `<img src="${escapeHtml(a.dataUrl)}" alt="${escapeHtml(a.name)}">`).join('')}</div>`
       : '';
-    this._addMessageBubble('user', `${attHtml}<div>${escapeHtml(finalMsg)}</div>`, { rawText: finalMsg });
+    const compHtml = componentAttachments.length
+      ? `<div class="msg-component-chips">${componentAttachments.map((c) => `<span class="msg-comp-chip"><span class="att-ui-dot" style="background:${escapeHtml(c.librarySwatch || '#F59E0B')}"></span><strong>${escapeHtml(c.name)}</strong><span>${escapeHtml(c.libraryName)}</span></span>`).join('')}</div>`
+      : '';
+    this._addMessageBubble('user', `${attHtml}${compHtml}<div>${escapeHtml(finalMsg)}</div>`, { rawText: finalMsg });
     if (input) {
       input.value = '';
       input.style.height = 'auto';
     }
     this.wsAttachments = [];
+    this.wsComponentAttachments = [];
     this._renderAttachments('ws');
     this._saveChatHistory();
 
@@ -2471,6 +2898,7 @@ export class WebForgeStudio {
       id: planId,
       originalPrompt: finalMsg,
       attachments,
+      componentAttachments,
       planText: '',
       status: 'streaming', // streaming | ready | approved | discarded
       editing: false,
@@ -2669,9 +3097,11 @@ export class WebForgeStudio {
       : approvedPlan
         ? String(approvedPlan.executionPrompt || '').trim()
         : (input?.value || '').trim();
-    if ((!msg && !this.wsAttachments.length) || this.isGenerating) return;
+    if ((!msg && !this.wsAttachments.length && !this.wsComponentAttachments.length) || this.isGenerating) return;
 
-    const finalMsg = msg || 'Implement the design shown in the attached screenshot.';
+    const finalMsg = msg || (this.wsComponentAttachments.length
+      ? `Apply the attached ${this.wsComponentAttachments.map((c) => `"${c.name}"`).join(', ')} UI component${this.wsComponentAttachments.length === 1 ? '' : 's'} into the current project.`
+      : 'Implement the design shown in the attached screenshot.');
     if (!this.activeProjectId) {
       if (resumeJob?.projectId && this.projectsList.some((p) => p.id === resumeJob.projectId)) {
         this.openProject(resumeJob.projectId);
@@ -2692,15 +3122,23 @@ export class WebForgeStudio {
       : approvedPlan
         ? (approvedPlan.attachments || [])
         : this.wsAttachments.slice();
+    const componentAttachments = isResume
+      ? []
+      : approvedPlan
+        ? (approvedPlan.componentAttachments || [])
+        : this.wsComponentAttachments.slice();
     if (!isResume) {
       this.saveVFSHistory();
       const attHtml = attachments.length
         ? `<div class="msg-attachments">${attachments.map((a) => `<img src="${escapeHtml(a.dataUrl)}" alt="${escapeHtml(a.name)}">`).join('')}</div>`
         : '';
+      const compHtml = componentAttachments.length
+        ? `<div class="msg-component-chips">${componentAttachments.map((c) => `<span class="msg-comp-chip"><span class="att-ui-dot" style="background:${escapeHtml(c.librarySwatch || '#F59E0B')}"></span><strong>${escapeHtml(c.name)}</strong><span>${escapeHtml(c.libraryName)}</span></span>`).join('')}</div>`
+        : '';
       const displayBubbleText = approvedPlan
         ? `Approved plan — building "${approvedPlan.originalPrompt.slice(0, 120)}"`
         : finalMsg;
-      this._addMessageBubble('user', `${attHtml}<div>${escapeHtml(displayBubbleText)}</div>`, { rawText: displayBubbleText });
+      this._addMessageBubble('user', `${attHtml}${compHtml}<div>${escapeHtml(displayBubbleText)}</div>`, { rawText: displayBubbleText });
       this._saveChatHistory();
       if (!approvedPlan) {
         if (input) {
@@ -2708,6 +3146,7 @@ export class WebForgeStudio {
           input.style.height = 'auto';
         }
         this.wsAttachments = [];
+        this.wsComponentAttachments = [];
         this._renderAttachments('ws');
       }
       this._setRetryAvailable(false);
@@ -2734,7 +3173,7 @@ export class WebForgeStudio {
       const activeUiLib = this.uiLibraryManager.getActiveLibrary();
       let uiLibraryGuide = activeUiLib ? this.uiLibraryManager.buildPromptGuide(activeUiLib.id) : '';
       if (!isResume && activeUiLib?.isRemoteCatalog && finalMsg) {
-        const matchedRef = await this.uiLibraryManager.fetchAwesomeAiMatches(finalMsg, 2);
+        const matchedRef = await this.uiLibraryManager.fetchRemoteAiMatches(activeUiLib.id, finalMsg, 2);
         if (matchedRef) uiLibraryGuide = `${uiLibraryGuide}\n\n${matchedRef}`;
       }
       const baseSystemPrompt = this.skillManager.getSystemPrompt(activeProj?.customInstructions || '');
@@ -2760,11 +3199,13 @@ export class WebForgeStudio {
       const projectSummary = safeStorageGet(`wf_project_summary_${this.activeProjectId}`, '');
       const modeInstructions = buildModeInstructions(requestMode);
 
+      const attachedComponentsPrompt = formatAttachedComponentsForPrompt(componentAttachments);
       let userTextPrompt = [
         elementCtx,
         projectSummary ? `Current project summary:\n${projectSummary}` : '',
         hasUserAskedBefore ? `Current codebase:\n\n${fileContext}` : `Initial starter codebase:\n\n${fileContext}`,
         `User instruction:\n${finalMsg}`,
+        attachedComponentsPrompt,
         modeInstructions,
         'Output valid complete file blocks only when code changes are needed. Escape quotes/newlines inside JS strings cleanly.',
       ].filter(Boolean).join('\n\n');
@@ -2778,46 +3219,16 @@ export class WebForgeStudio {
         ].join('\n');
       }
 
-      const initialHtml = `
-        <div class="agent-turn-card" data-turn-id="${turnId}">
-          <div class="agent-turn-head">
-            <span class="agent-status-indicator running" aria-hidden="true"></span>
-            <span class="gen-status-title">${isResume ? 'Resuming build…' : 'Planning & building…'}</span>
-            <span class="gen-status-meta tabular-nums">${requestMode}</span>
-          </div>
-          <details class="web-search-accordion hidden">
-            <summary>
-              <i data-lucide="globe"></i>
-              <span class="web-search-summary-label">Web search</span>
-              <span class="thinking-meta tabular-nums web-search-meta"></span>
-            </summary>
-            <div class="web-search-list"></div>
-          </details>
-          <div class="subagents-panel hidden">
-            <div class="subagents-header">
-              <span class="subagents-title">Parallel Sub-Agents</span>
-              <span class="subagents-mode-meta tabular-nums">Running simultaneously</span>
-            </div>
-            <div class="subagents-grid"></div>
-            <div class="subagent-fallback-banner hidden"></div>
-          </div>
-          <details class="thinking-accordion hidden">
-            <summary>
-              <i data-lucide="brain"></i>
-              <span class="thinking-summary-label">Thinking trace</span>
-              <span class="thinking-meta tabular-nums">0 chars</span>
-            </summary>
-            <pre class="thinking-body"></pre>
-          </details>
-          <div class="gen-steps-container">
-            <div class="gen-step done">
-              <span class="icon-wrapper"><i data-lucide="check"></i></span>
-              <span class="gen-step-label">Context prepared (${requestMode})</span>
-            </div>
-          </div>
-        </div>`;
+      const activityTurn = createActivityTurnState({
+        turnId,
+        mode: requestMode,
+        prompt: finalMsg,
+        isResume,
+        startedAt: Date.now(),
+      });
+      this._activityTurns.set(turnId, activityTurn);
 
-      aiBubbleId = this._addMessageBubble('ai', initialHtml);
+      aiBubbleId = this._addMessageBubble('ai', this._renderLovableCardHtml(activityTurn));
       const processedFiles = new Set();
       this._saveChatHistory();
 
@@ -2828,37 +3239,37 @@ export class WebForgeStudio {
       if (!isResume && shouldAutoRunWebSearch({ enabled: this.agentPrefs.webSearch, userMessage: finalMsg })) {
         const searchQuery = extractSearchQuery(finalMsg);
         if (searchQuery) {
-          const bubbleEl = aiBubbleId ? document.getElementById(aiBubbleId) : null;
-          const titleEl = bubbleEl?.querySelector('.gen-status-title');
-          if (titleEl) titleEl.textContent = `Searching web: ${searchQuery.slice(0, 42)}…`;
+          activityTurn.headline = `Searching web…`;
+          activityTurn.activeDetail = searchQuery.slice(0, 44);
+          addOrUpdateActivityStep(activityTurn, {
+            key: 'web-search',
+            label: `Searching web for "${searchQuery.slice(0, 42)}"`,
+            status: 'active',
+          });
+          this._syncLovableTurnBubble(aiBubbleId, activityTurn);
           try {
             const searchRes = await performWebSearch(searchQuery, { limit: 5 });
             if (searchRes?.results?.length) {
               webSearchContext = formatSearchResultsForPrompt(searchRes);
               userTextPrompt = `${webSearchContext}\n\n${userTextPrompt}`;
-              const acc = bubbleEl?.querySelector('.web-search-accordion');
-              const list = bubbleEl?.querySelector('.web-search-list');
-              const lbl = bubbleEl?.querySelector('.web-search-summary-label');
-              const meta = bubbleEl?.querySelector('.web-search-meta');
-              if (acc && list) {
-                acc.classList.remove('hidden');
-                if (lbl) lbl.textContent = `Web sources · "${searchRes.query.slice(0, 36)}"`;
-                if (meta) meta.textContent = `${searchRes.results.length} hits · ${searchRes.engine}`;
-                list.innerHTML = searchRes.results.map((r) => `
-                  <div class="web-search-result-item">
-                    <a href="${escapeHtml(r.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(r.title)}</a>
-                    ${r.snippet ? `<small>${escapeHtml(r.snippet.slice(0, 180))}</small>` : ''}
-                    <span class="web-search-result-meta">${escapeHtml(r.source || 'Web')}</span>
-                  </div>`).join('');
-                this._safeCreateIcons(acc);
-              }
-              const steps = bubbleEl?.querySelector('.gen-steps-container');
-              steps?.insertAdjacentHTML('beforeend', `
-                <div class="gen-step done">
-                  <span class="icon-wrapper"><i data-lucide="check"></i></span>
-                  <span class="gen-step-label">Web search grounded (${searchRes.results.length} results via ${escapeHtml(searchRes.engine)})</span>
-                </div>`);
-              if (steps) this._safeCreateIcons(steps);
+              activityTurn.webQuery = searchRes.query;
+              activityTurn.webEngine = searchRes.engine || 'Web';
+              activityTurn.webSources = searchRes.results;
+              addOrUpdateActivityStep(activityTurn, {
+                key: 'web-search',
+                label: `Grounded with ${searchRes.results.length} web results (${searchRes.engine || 'Web'})`,
+                status: 'done',
+              });
+              activityTurn.headline = 'Building from live context…';
+              activityTurn.activeDetail = `${searchRes.results.length} web sources ready`;
+              this._syncLovableTurnBubble(aiBubbleId, activityTurn);
+            } else {
+              addOrUpdateActivityStep(activityTurn, {
+                key: 'web-search',
+                label: 'Web search completed (no extra hits)',
+                status: 'done',
+              });
+              this._syncLovableTurnBubble(aiBubbleId, activityTurn);
             }
           } catch (searchErr) {
             if (searchErr?.name === 'AbortError') throw searchErr;
@@ -2896,17 +3307,19 @@ export class WebForgeStudio {
       });
 
       if (trySubAgents) {
-        const bubbleEl = aiBubbleId ? document.getElementById(aiBubbleId) : null;
-        const panel = bubbleEl?.querySelector('.subagents-panel');
-        const grid = bubbleEl?.querySelector('.subagents-grid');
-        const modeMeta = bubbleEl?.querySelector('.subagents-mode-meta');
-        const fallbackEl = bubbleEl?.querySelector('.subagent-fallback-banner');
-        const titleEl = bubbleEl?.querySelector('.gen-status-title');
-
         this._subAgentAbort = new AbortController();
-        if (titleEl) titleEl.textContent = 'Running parallel sub-agents…';
+        activityTurn.headline = 'Building with parallel sub-agents…';
+        activityTurn.activeDetail = 'Design · Sections · App Shell';
+        activityTurn.subAgentMode = 'Running simultaneously';
+        addOrUpdateActivityStep(activityTurn, {
+          key: 'subagents',
+          label: 'Coordinating parallel sub-agents',
+          status: 'active',
+        });
+        this._syncLovableTurnBubble(aiBubbleId, activityTurn);
         this.preview.showLoader('Parallel Sub-Agents building…', 'Design · Sections · App Shell running simultaneously');
 
+        let lastSaSync = 0;
         try {
           const saResult = await runSubAgents({
             provider: this.provider,
@@ -2917,41 +3330,42 @@ export class WebForgeStudio {
             isHtml: isHtmlVfs(this.VFS),
             signal: this._subAgentAbort.signal,
             onPlan: (plan) => {
-              if (!panel || !grid) return;
-              panel.classList.remove('hidden');
-              grid.innerHTML = plan.map((t) => `
-                <div class="subagent-card status-running" data-sa-id="${escapeHtml(t.id)}">
-                  <div class="subagent-card-left">
-                    <span class="gen-step-dot"></span>
-                    <span class="subagent-card-role">${escapeHtml(t.role)}</span>
-                    <span class="subagent-card-file truncate">${escapeHtml(t.targetFiles.join(', '))}</span>
-                  </div>
-                  <span class="subagent-card-meta tabular-nums">running…</span>
-                </div>`).join('');
+              activityTurn.subAgents = plan.map((t) => ({
+                id: t.id,
+                role: t.role,
+                targetFiles: t.targetFiles.join(', '),
+                status: 'running',
+                meta: 'running…',
+              }));
+              this._syncLovableTurnBubble(aiBubbleId, activityTurn);
             },
             onAgentUpdate: (upd) => {
-              const row = grid?.querySelector(`[data-sa-id="${upd.id}"]`);
-              if (!row) return;
-              row.className = `subagent-card status-${upd.status || 'running'}`;
-              const metaEl = row.querySelector('.subagent-card-meta');
-              if (metaEl) {
-                if (upd.status === 'done') metaEl.textContent = `done · ${upd.elapsedSec}s`;
-                else if (upd.status === 'retrying') metaEl.textContent = 'sequential retry…';
-                else if (upd.status === 'failed') metaEl.textContent = 'failed';
-                else metaEl.textContent = upd.chars ? `${Math.ceil(upd.chars / 4)}t · ${upd.elapsedSec || 0}s` : 'running…';
+              const target = activityTurn.subAgents.find((a) => a.id === upd.id);
+              if (target) {
+                target.status = upd.status || 'running';
+                if (upd.status === 'done') target.meta = `done · ${upd.elapsedSec}s`;
+                else if (upd.status === 'retrying') target.meta = 'sequential retry…';
+                else if (upd.status === 'failed') target.meta = 'failed';
+                else target.meta = upd.chars ? `${Math.ceil(upd.chars / 4)}t · ${upd.elapsedSec || 0}s` : 'running…';
+                if (upd.activeFile) target.targetFiles = upd.activeFile;
               }
               if (upd.activeFile) {
-                const fileEl = row.querySelector('.subagent-card-file');
-                if (fileEl) fileEl.textContent = upd.activeFile;
+                activityTurn.headline = `Writing ${upd.activeFile}…`;
+                activityTurn.activeDetail = `${upd.role || 'Sub-agent'} active`;
+              }
+              activityTurn.elapsedSec = ((Date.now() - startTime) / 1000).toFixed(1);
+              const now = Date.now();
+              if (now - lastSaSync > 120 || upd.status === 'done' || upd.status === 'failed') {
+                lastSaSync = now;
+                this._syncLovableTurnBubble(aiBubbleId, activityTurn);
               }
             },
             onFallback: ({ reason }) => {
-              if (modeMeta) modeMeta.textContent = 'Sequential fallback';
-              if (fallbackEl) {
-                fallbackEl.textContent = reason;
-                fallbackEl.classList.remove('hidden');
-              }
-              if (titleEl) titleEl.textContent = 'Building sequentially (fallback)…';
+              activityTurn.subAgentMode = 'Sequential fallback';
+              activityTurn.subAgentFallback = reason;
+              activityTurn.headline = 'Building sequentially…';
+              activityTurn.activeDetail = 'Auto-switched from parallel';
+              this._syncLovableTurnBubble(aiBubbleId, activityTurn);
               this.preview.showLoader('Sequential fallback active…', 'Running remaining sub-agents one by one');
             },
           });
@@ -2965,31 +3379,31 @@ export class WebForgeStudio {
               .map(([p, c]) => `### FILE: ${p}\n\`\`\`\n${c}\n\`\`\``)
               .join('\n\n');
             parsedSplit = { content: streamedCode, reasoning: latestReasoning };
-            if (modeMeta) {
-              modeMeta.textContent = saResult.mode === 'parallel' ? `${finalPaths.length} files · parallel` : `${finalPaths.length} files · sequential`;
-            }
-            if (bubbleEl && latestReasoning) {
-              const acc = bubbleEl.querySelector('.thinking-accordion');
-              const body = bubbleEl.querySelector('.thinking-body');
-              const meta = bubbleEl.querySelector('.thinking-meta');
-              if (acc && body) {
-                acc.classList.remove('hidden');
-                body.textContent = latestReasoning;
-                if (meta) meta.textContent = `${latestReasoning.length.toLocaleString()} chars`;
-              }
-            }
-          } else if (fallbackEl) {
-            if (modeMeta) modeMeta.textContent = 'Single-agent fallback';
-            fallbackEl.textContent = saResult.fallbackReason || 'Parallel sub-agents unavailable — building with single agent.';
-            fallbackEl.classList.remove('hidden');
+            activityTurn.reasoning = latestReasoning;
+            activityTurn.subAgentMode = saResult.mode === 'parallel'
+              ? `${finalPaths.length} files · parallel`
+              : `${finalPaths.length} files · sequential`;
+            addOrUpdateActivityStep(activityTurn, {
+              key: 'subagents',
+              label: `Sub-agents generated ${finalPaths.length} files`,
+              status: 'done',
+            });
+            this._syncLovableTurnBubble(aiBubbleId, activityTurn);
+          } else {
+            activityTurn.subAgentMode = 'Single-agent fallback';
+            activityTurn.subAgentFallback = saResult.fallbackReason || 'Parallel sub-agents unavailable — building with single agent.';
+            addOrUpdateActivityStep(activityTurn, {
+              key: 'subagents',
+              label: 'Switched to single-agent build',
+              status: 'done',
+            });
+            this._syncLovableTurnBubble(aiBubbleId, activityTurn);
           }
         } catch (saErr) {
           if (saErr?.name === 'AbortError' || this._userStoppedGeneration) throw saErr;
-          if (fallbackEl) {
-            if (modeMeta) modeMeta.textContent = 'Single-agent fallback';
-            fallbackEl.textContent = `Parallel sub-agents unavailable (${saErr.message?.slice(0, 80) || 'error'}) — falling back to single-agent build.`;
-            fallbackEl.classList.remove('hidden');
-          }
+          activityTurn.subAgentMode = 'Single-agent fallback';
+          activityTurn.subAgentFallback = `Parallel sub-agents unavailable (${saErr.message?.slice(0, 80) || 'error'}) — falling back to single-agent build.`;
+          this._syncLovableTurnBubble(aiBubbleId, activityTurn);
         } finally {
           this._subAgentAbort = null;
         }
@@ -2998,6 +3412,7 @@ export class WebForgeStudio {
       // ── Step 3: Standard Single-Agent Streaming Build (or fallback when sub-agents skipped/failed) ──
       if (!usedSubAgentsSuccess) {
         const userPayload = buildChatMessageContent(userTextPrompt, attachments);
+        let lastUiSync = 0;
 
         streamedCode = await this.provider.generate(
           systemPrompt,
@@ -3008,17 +3423,17 @@ export class WebForgeStudio {
             const combinedReasoning = [sseReasoning, split.reasoning].filter(Boolean).join('\n\n').trim();
             latestReasoning = combinedReasoning;
 
-            const bubbleEl = aiBubbleId ? document.getElementById(aiBubbleId) : null;
-            if (bubbleEl && combinedReasoning) {
-              const acc = bubbleEl.querySelector('.thinking-accordion');
-              const body = bubbleEl.querySelector('.thinking-body');
-              const meta = bubbleEl.querySelector('.thinking-meta');
-              const lbl = bubbleEl.querySelector('.thinking-summary-label');
-              if (acc && body) {
-                acc.classList.remove('hidden');
-                body.textContent = combinedReasoning;
-                if (meta) meta.textContent = `${combinedReasoning.length.toLocaleString()} chars`;
-                if (lbl) lbl.textContent = split.isThinking ? 'Thinking…' : 'Thought process';
+            if (combinedReasoning) {
+              activityTurn.reasoning = combinedReasoning;
+              activityTurn.isThinking = Boolean(split.isThinking);
+              if (split.isThinking && processedFiles.size === 0) {
+                activityTurn.headline = 'Thinking through architecture…';
+                activityTurn.activeDetail = `${combinedReasoning.length.toLocaleString()} chars`;
+                addOrUpdateActivityStep(activityTurn, {
+                  key: 'thinking',
+                  label: 'Reasoning through layout & components',
+                  status: 'active',
+                });
               }
             }
 
@@ -3029,27 +3444,20 @@ export class WebForgeStudio {
             this._scheduleGenCheckpoint(full);
 
             const activeWrite = detectActiveWritingFile(full);
+            let fileChanged = false;
             if (activeWrite) {
               this.preview.showLoader('AI is writing code…', activeWrite);
-              const titleEl = bubbleEl?.querySelector('.gen-status-title');
-              if (titleEl) titleEl.textContent = `Writing ${activeWrite}`;
+              activityTurn.headline = `Writing ${activeWrite}…`;
+              activityTurn.activeDetail = `${processedFiles.size + (processedFiles.has(activeWrite) ? 0 : 1)} file${processedFiles.size === 0 ? '' : 's'} touched`;
               if (!processedFiles.has(activeWrite)) {
                 processedFiles.add(activeWrite);
-                const steps = bubbleEl?.querySelector('.gen-steps-container');
-                if (steps) {
-                  steps.querySelectorAll('.gen-step:not(.done)').forEach((prev) => {
-                    prev.classList.remove('active');
-                    prev.classList.add('done');
-                    const iw = prev.querySelector('.icon-wrapper');
-                    if (iw) iw.innerHTML = '<i data-lucide="check"></i>';
-                  });
-                  steps.insertAdjacentHTML('beforeend', `
-                    <div class="gen-step active">
-                      <span class="icon-wrapper"><span class="gen-step-dot"></span></span>
-                      <span class="gen-step-label">Writing <code>${escapeHtml(activeWrite)}</code></span>
-                    </div>`);
-                  this._safeCreateIcons(steps);
-                }
+                fileChanged = true;
+                addOrUpdateActivityStep(activityTurn, {
+                  key: `file:${activeWrite}`,
+                  label: 'Writing',
+                  codeLabel: activeWrite,
+                  status: 'active',
+                });
               }
             }
 
@@ -3061,7 +3469,16 @@ export class WebForgeStudio {
             }
 
             const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-            this._updateStatusBar({ tokens: Math.ceil(full.length / 4), time: elapsed });
+            const tokCount = Math.ceil(full.length / 4);
+            activityTurn.elapsedSec = elapsed;
+            activityTurn.tokens = tokCount;
+            this._updateStatusBar({ tokens: tokCount, time: elapsed });
+
+            const now = Date.now();
+            if (fileChanged || now - lastUiSync > 140) {
+              lastUiSync = now;
+              this._syncLovableTurnBubble(aiBubbleId, activityTurn);
+            }
           },
           this.conversationHistory.slice(-10)
         );
@@ -3071,6 +3488,9 @@ export class WebForgeStudio {
         finalPaths = getParsedFilePaths(parsedSplit.content, { includePartial: false });
 
         if (!finalPaths.length && requestMode !== 'DISCUSS') {
+          activityTurn.headline = 'Formatting generated files…';
+          activityTurn.activeDetail = 'Normalizing file blocks';
+          this._syncLovableTurnBubble(aiBubbleId, activityTurn);
           this.preview.showLoader('Formatting output…', 'Requesting structured file blocks…');
           const repaired = await this.provider.generate(
             systemPrompt,
@@ -3087,13 +3507,21 @@ export class WebForgeStudio {
           if (requestMode === 'DISCUSS') {
             const bubbleEl = aiBubbleId ? document.getElementById(aiBubbleId) : null;
             const cleanAnswer = parsedSplit.content || 'No code changes needed.';
+            finalizeActivityTurn(activityTurn, {
+              status: 'done',
+              headline: 'Answered question',
+              elapsedSec: ((Date.now() - startTime) / 1000).toFixed(1),
+              tokens: estimateTokens(streamedCode),
+            });
             if (bubbleEl) {
-              const reasoningBlock = latestReasoning
-                ? `<details class="thinking-accordion"><summary><i data-lucide="brain"></i><span>Thought process</span></summary><pre class="thinking-body">${escapeHtml(latestReasoning)}</pre></details>`
+              const triggerHtml = latestReasoning || activityTurn.webSources.length
+                ? this._renderLovableCardHtml(activityTurn)
                 : '';
-              bubbleEl.querySelector('.message-content').innerHTML = `${reasoningBlock}<div class="ai-prose">${escapeHtml(cleanAnswer)}</div>`;
+              bubbleEl.querySelector('.message-content').innerHTML = `${triggerHtml}<div class="ai-prose">${escapeHtml(cleanAnswer)}</div>`;
+              this._bindChatMessageActions(bubbleEl);
               this._safeCreateIcons(bubbleEl);
             }
+            if (this._openActivityTurnId === turnId) this._renderActivityDrawer(activityTurn);
             this.conversationHistory.push(
               { role: 'user', content: finalMsg },
               { role: 'assistant', content: cleanAnswer.slice(0, 1200) }
@@ -3140,62 +3568,30 @@ export class WebForgeStudio {
         this.activeProjectId
       );
 
-      // Finalize agent turn card with Open / Diff / Revert file actions
-      const bubbleEl = aiBubbleId ? document.getElementById(aiBubbleId) : null;
-      if (bubbleEl) {
-        const card = bubbleEl.querySelector('.agent-turn-card');
-        if (card) {
-          card.classList.add('done');
-          const ind = card.querySelector('.agent-status-indicator');
-          if (ind) { ind.classList.remove('running'); ind.classList.add('done'); }
-          const title = card.querySelector('.gen-status-title');
-          if (title) title.textContent = 'App ready';
-          const meta = card.querySelector('.gen-status-meta');
-          if (meta) meta.textContent = `${fileDiffs.length || finalPaths.length} file${finalPaths.length === 1 ? '' : 's'}`;
-          const thoughtLabel = card.querySelector('.thinking-summary-label');
-          if (thoughtLabel) thoughtLabel.textContent = 'Thought process';
-          card.querySelectorAll('.gen-step').forEach((st) => {
-            st.classList.remove('active');
-            st.classList.add('done');
-            const iw = st.querySelector('.icon-wrapper');
-            if (iw) iw.innerHTML = '<i data-lucide="check"></i>';
-          });
-
-          const fileActionsHtml = fileDiffs.length
-            ? `<div class="turn-files-list">
-                ${fileDiffs.map((d) => `
-                  <div class="turn-file-row" data-file-path="${escapeHtml(d.path)}">
-                    <span class="turn-file-name truncate">${escapeHtml(d.path)}</span>
-                    <span class="turn-file-stats tabular-nums">
-                      ${d.added ? `<span class="diff-stat-add">+${d.added}</span>` : ''}
-                      ${d.removed ? `<span class="diff-stat-del">-${d.removed}</span>` : ''}
-                    </span>
-                    <button type="button" class="turn-file-btn" data-turn-action="open">Open</button>
-                    <button type="button" class="turn-file-btn" data-turn-action="diff" data-cp-id="${escapeHtml(cp?.id || 'latest')}">Diff</button>
-                  </div>`).join('')}
-              </div>`
-            : '';
-
-          card.insertAdjacentHTML('beforeend', `
-            ${fileActionsHtml}
-            <div class="turn-cp-bar">
-              <span>Saved checkpoint</span>
-              <div class="turn-cp-actions">
-                ${cp?.beforeFiles
-                  ? `<button type="button" class="turn-file-btn turn-revert-btn" data-turn-action="revert-before-cp" data-cp-id="${escapeHtml(cp.id)}"><i data-lucide="rotate-ccw"></i> Revert to Before Turn</button>`
-                  : ''}
-                ${cp ? `<button type="button" class="turn-file-btn" data-turn-action="restore-cp" data-cp-id="${escapeHtml(cp.id)}">Restore Snapshot</button>` : ''}
-              </div>
-            </div>
-          `);
-          this._bindChatMessageActions(bubbleEl);
-          this._safeCreateIcons(bubbleEl);
-        }
-      }
+      // Finalize Lovable-style minimal turn card & sync Activity Side Screen
+      const elapsedFinal = ((Date.now() - startTime) / 1000).toFixed(1);
+      const finalTokenCount = estimateTokens(streamedCode);
+      addOrUpdateActivityStep(activityTurn, {
+        key: 'checkpoint',
+        label: 'Compiled preview & saved checkpoint',
+        status: 'done',
+      });
+      finalizeActivityTurn(activityTurn, {
+        status: 'done',
+        headline: fileDiffs.length
+          ? `Edited ${fileDiffs.length} file${fileDiffs.length === 1 ? '' : 's'}`
+          : 'App ready',
+        elapsedSec: elapsedFinal,
+        tokens: finalTokenCount,
+        files: fileDiffs,
+        checkpointId: cp?.id || '',
+        hasBeforeFiles: Boolean(cp?.beforeFiles),
+      });
+      this._syncLovableTurnBubble(aiBubbleId, activityTurn);
 
       this._saveChatHistory();
       this._clearGenJob();
-      this._updateStatusBar({ tokens: estimateTokens(streamedCode), time: ((Date.now() - startTime) / 1000).toFixed(1), done: true });
+      this._updateStatusBar({ tokens: finalTokenCount, time: elapsedFinal, done: true });
 
       this.preview.update(this.VFS);
       this._scheduleThumbnailCapture(true);
@@ -3207,19 +3603,32 @@ export class WebForgeStudio {
     } catch (e) {
       this.preview.hideLoader();
       const isConn = this._isConnectionError(e);
+      const turnRecord = this._activityTurns.get(turnId);
+      if (turnRecord) {
+        finalizeActivityTurn(turnRecord, {
+          status: this._userStoppedGeneration ? 'stopped' : 'error',
+          headline: this._userStoppedGeneration ? 'Generation stopped' : (isConn ? 'Connection issue' : 'Build error'),
+          errorMessage: e?.message || 'Generation interrupted',
+        });
+        if (this._openActivityTurnId === turnId) this._renderActivityDrawer(turnRecord);
+      }
       if (aiBubbleId) {
         const bubbleEl = document.getElementById(aiBubbleId);
         if (bubbleEl) {
           const retryBtn = !this._userStoppedGeneration
             ? `<button type="button" class="btn btn-outline btn-sm msg-retry-btn" data-action="retry-gen"><i data-lucide="rotate-cw"></i> ${isConn ? 'Retry connection' : 'Retry'}</button>`
             : '';
+          const inspectBtn = turnRecord
+            ? `<button type="button" class="btn btn-ghost btn-sm" data-open-activity-turn="${escapeHtml(turnId)}" data-activity-json="${escapeHtml(serializeTurnActivity(turnRecord))}">View Activity</button>`
+            : '';
           bubbleEl.querySelector('.message-content').innerHTML = `
             <div class="gen-error-card">
               <strong>${isConn ? 'Connection issue' : 'Generation error'}</strong>
               <p>${escapeHtml(e.message)}</p>
-              ${retryBtn}
+              <div class="gen-error-actions">${retryBtn}${inspectBtn}</div>
             </div>`;
           bubbleEl.querySelector('[data-action="retry-gen"]')?.addEventListener('click', () => this.retryLastGeneration());
+          this._bindChatMessageActions(bubbleEl);
           this._safeCreateIcons(bubbleEl);
         }
       }
@@ -3318,18 +3727,279 @@ export class WebForgeStudio {
     }
   }
 
+  // ── Lovable-Style Minimal Activity Pill & Slide-Over Side Screen ──
+
+  _renderLovableCardHtml(turn) {
+    const summary = buildActivitySummary(turn);
+    const isRunning = turn.status === 'running';
+    const isError = turn.status === 'error';
+    const encoded = serializeTurnActivity(turn);
+    const stepsTotal = Math.max(1, (turn.steps || []).length);
+    const stepsDone = (turn.steps || []).filter((st) => st.status === 'done').length;
+    const filesWritten = Array.isArray(turn.files) ? turn.files.length : 0;
+    const progressPct = isRunning
+      ? Math.min(94, Math.max(14, Math.round(((stepsDone + Math.min(filesWritten, 4) * 0.5) / (stepsTotal + 2)) * 100)))
+      : 100;
+    const ringRadius = 7.5;
+    const ringCirc = Number((2 * Math.PI * ringRadius).toFixed(2));
+    const ringOffset = Number((ringCirc * (1 - progressPct / 100)).toFixed(2));
+
+    const statusIcon = isRunning
+      ? `<span class="lovable-status-ring" aria-hidden="true">
+           <svg viewBox="0 0 20 20" width="20" height="20">
+             <circle class="lovable-ring-track" cx="10" cy="10" r="${ringRadius}" fill="none" stroke-width="2"></circle>
+             <circle class="lovable-ring-arc" cx="10" cy="10" r="${ringRadius}" fill="none" stroke-width="2" stroke-dasharray="${ringCirc}" stroke-dashoffset="${ringOffset}"></circle>
+           </svg>
+         </span>`
+      : isError
+        ? `<span class="lovable-status-icon is-error" aria-hidden="true"><i data-lucide="alert-circle"></i></span>`
+        : `<span class="lovable-status-icon is-done" aria-hidden="true"><i data-lucide="check"></i></span>`;
+
+    const filesFooter = !isRunning && Array.isArray(turn.files) && turn.files.length
+      ? `<div class="lovable-quick-footer">
+          <div class="lovable-quick-files">
+            ${turn.files.slice(0, 3).map((d) => `
+              <button type="button" class="lovable-file-link" data-file-path="${escapeHtml(d.path)}" data-turn-action="open" title="Open ${escapeHtml(d.path)}">
+                <i data-lucide="file-code-2"></i>
+                <span class="truncate">${escapeHtml(d.path.split('/').pop())}</span>
+              </button>`).join('')}
+            ${turn.files.length > 3 ? `<button type="button" class="lovable-more-files" data-open-activity-turn="${escapeHtml(turn.turnId)}" data-activity-json="${escapeHtml(encoded)}">+${turn.files.length - 3} more</button>` : ''}
+          </div>
+          ${turn.hasBeforeFiles && turn.checkpointId
+            ? `<button type="button" class="turn-file-btn turn-revert-btn" data-turn-action="revert-before-cp" data-cp-id="${escapeHtml(turn.checkpointId)}" title="${escapeHtml(turn.revertLabel || 'Revert')}">
+                 <i data-lucide="rotate-ccw"></i> Revert
+               </button>`
+            : ''}
+        </div>`
+      : '';
+
+    return `
+      <div class="lovable-activity-card kokonut-island status-${escapeHtml(turn.status || 'running')}" data-turn-id="${escapeHtml(turn.turnId)}">
+        <button type="button" class="lovable-activity-trigger" data-open-activity-turn="${escapeHtml(turn.turnId)}" data-activity-json="${escapeHtml(encoded)}" aria-label="${escapeHtml(summary.headline)} — click to open activity side panel">
+          ${statusIcon}
+          <span class="lovable-activity-copy">
+            <span class="lovable-activity-headline ${isRunning ? 'kokonut-shimmer' : ''}">${escapeHtml(summary.headline)}</span>
+            <span class="lovable-activity-sub tabular-nums">${escapeHtml(summary.subtitle)}</span>
+          </span>
+          ${isRunning ? `<span class="lovable-island-pct tabular-nums">${progressPct}%</span>` : ''}
+          <span class="lovable-activity-chevron" aria-hidden="true"><i data-lucide="chevron-right"></i></span>
+        </button>
+        ${filesFooter}
+      </div>`;
+  }
+
+  _syncLovableTurnBubble(bubbleId, turn) {
+    if (bubbleId) {
+      const bubbleEl = document.getElementById(bubbleId);
+      const content = bubbleEl?.querySelector('.message-content');
+      if (content) {
+        content.innerHTML = this._renderLovableCardHtml(turn);
+        this._bindChatMessageActions(bubbleEl);
+        this._safeCreateIcons(bubbleEl);
+      }
+    }
+    if (this._openActivityTurnId === turn.turnId) {
+      this._renderActivityDrawer(turn);
+    }
+  }
+
+  openActivityDrawer(turnId, fallbackEncoded = '') {
+    let turn = this._activityTurns.get(turnId);
+    if (!turn && fallbackEncoded) {
+      turn = hydrateTurnActivity(fallbackEncoded);
+      if (turn) this._activityTurns.set(turnId, turn);
+    }
+    if (!turn) return;
+
+    this._openActivityTurnId = turnId;
+    // On mobile workspace view, switch to stage pane so the side screen is immediately visible
+    if (window.innerWidth <= 900) {
+      this.mobilePane = 'stage';
+      this._updateMobilePaneUI();
+    }
+    const drawer = document.getElementById('agentActivityDrawer');
+    if (drawer) {
+      drawer.classList.remove('hidden');
+      requestAnimationFrame(() => drawer.classList.add('is-open'));
+    }
+    this._renderActivityDrawer(turn);
+  }
+
+  closeActivityDrawer() {
+    this._openActivityTurnId = null;
+    const drawer = document.getElementById('agentActivityDrawer');
+    if (!drawer) return;
+    drawer.classList.remove('is-open');
+    setTimeout(() => {
+      if (!this._openActivityTurnId) drawer.classList.add('hidden');
+    }, 200);
+  }
+
+  _renderActivityDrawer(turn) {
+    const titleEl = document.getElementById('activityDrawerTitle');
+    const metaEl = document.getElementById('activityDrawerMeta');
+    const iconEl = document.getElementById('activityDrawerStatusIcon');
+    const bodyEl = document.getElementById('activityDrawerBody');
+    if (!bodyEl || !turn) return;
+
+    const isRunning = turn.status === 'running';
+    if (titleEl) {
+      titleEl.textContent = turn.headline || 'Agent Activity';
+      titleEl.classList.toggle('kokonut-shimmer', isRunning);
+    }
+    if (metaEl) {
+      const metaParts = [turn.mode || 'BUILD'];
+      if (turn.elapsedSec && Number(turn.elapsedSec) > 0) metaParts.push(`${turn.elapsedSec}s`);
+      if (turn.tokens > 0) metaParts.push(`${turn.tokens.toLocaleString()} tok`);
+      metaParts.push(isRunning ? 'Live' : turn.status === 'done' ? 'Completed' : 'Stopped');
+      metaEl.textContent = metaParts.join(' · ');
+    }
+    if (iconEl) {
+      iconEl.className = `activity-drawer-spinner status-${turn.status || 'running'}`;
+      iconEl.innerHTML = isRunning
+        ? ''
+        : `<i data-lucide="${turn.status === 'error' ? 'alert-circle' : 'check'}"></i>`;
+    }
+
+    const stepsHtml = (turn.steps || []).map((st) => `
+      <div class="activity-step-row status-${escapeHtml(st.status || 'done')}">
+        <span class="activity-step-marker">
+          ${st.status === 'active'
+            ? '<span class="gen-step-dot"></span>'
+            : st.status === 'error'
+              ? '<i data-lucide="alert-circle"></i>'
+              : '<i data-lucide="check"></i>'}
+        </span>
+        <span class="activity-step-text">
+          ${escapeHtml(st.label)}${st.codeLabel ? ` <code>${escapeHtml(st.codeLabel)}</code>` : ''}
+        </span>
+      </div>`).join('');
+
+    const subAgentsHtml = Array.isArray(turn.subAgents) && turn.subAgents.length
+      ? `<section class="activity-section">
+          <div class="activity-section-head">
+            <span>Agent Lanes</span>
+            <span class="tabular-nums">${escapeHtml(turn.subAgentMode || 'Active')}</span>
+          </div>
+          <div class="subagents-grid">
+            ${turn.subAgents.map((sa) => `
+              <div class="subagent-card status-${escapeHtml(sa.status || 'running')}">
+                <div class="subagent-card-left">
+                  <span class="gen-step-dot"></span>
+                  <span class="subagent-card-role">${escapeHtml(sa.role)}</span>
+                  <span class="subagent-card-file truncate">${escapeHtml(sa.targetFiles || '')}</span>
+                </div>
+                <span class="subagent-card-meta tabular-nums">${escapeHtml(sa.meta || '')}</span>
+              </div>`).join('')}
+          </div>
+          ${turn.subAgentFallback ? `<div class="subagent-fallback-banner">${escapeHtml(turn.subAgentFallback)}</div>` : ''}
+        </section>`
+      : '';
+
+    const webHtml = Array.isArray(turn.webSources) && turn.webSources.length
+      ? `<section class="activity-section">
+          <div class="activity-section-head">
+            <span>Web Grounding</span>
+            <span class="tabular-nums">${turn.webSources.length} sources · ${escapeHtml(turn.webEngine || 'Web')}</span>
+          </div>
+          <div class="web-search-list">
+            ${turn.webSources.map((r) => `
+              <div class="web-search-result-item">
+                <a href="${escapeHtml(r.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(r.title)}</a>
+                ${r.snippet ? `<small>${escapeHtml(r.snippet.slice(0, 160))}</small>` : ''}
+              </div>`).join('')}
+          </div>
+        </section>`
+      : '';
+
+    const reasoningHtml = turn.reasoning
+      ? `<section class="activity-section">
+          <details class="thinking-accordion" open>
+            <summary>
+              <i data-lucide="brain"></i>
+              <span>${turn.isThinking ? 'Thinking live…' : 'Reasoning Trace'}</span>
+              <span class="thinking-meta tabular-nums">${turn.reasoning.length.toLocaleString()} chars</span>
+            </summary>
+            <pre class="thinking-body">${escapeHtml(turn.reasoning)}</pre>
+          </details>
+        </section>`
+      : '';
+
+    const filesHtml = Array.isArray(turn.files) && turn.files.length
+      ? `<section class="activity-section">
+          <div class="activity-section-head">
+            <span>Modified Files</span>
+            <span class="tabular-nums">${turn.files.length} file${turn.files.length === 1 ? '' : 's'}</span>
+          </div>
+          <div class="turn-files-list">
+            ${turn.files.map((d) => `
+              <div class="turn-file-row" data-file-path="${escapeHtml(d.path)}">
+                <span class="turn-file-name truncate">${escapeHtml(d.path)}</span>
+                <span class="turn-file-stats tabular-nums">
+                  ${d.added ? `<span class="diff-stat-add">+${d.added}</span>` : ''}
+                  ${d.removed ? `<span class="diff-stat-del">-${d.removed}</span>` : ''}
+                </span>
+                <button type="button" class="turn-file-btn" data-turn-action="open">Open</button>
+                <button type="button" class="turn-file-btn" data-turn-action="diff" data-cp-id="${escapeHtml(turn.checkpointId || 'latest')}">Diff</button>
+              </div>`).join('')}
+          </div>
+          ${turn.checkpointId
+            ? `<div class="turn-cp-bar">
+                <span>Checkpoint saved</span>
+                <div class="turn-cp-actions">
+                  ${turn.hasBeforeFiles ? `<button type="button" class="turn-file-btn turn-revert-btn" data-turn-action="revert-before-cp" data-cp-id="${escapeHtml(turn.checkpointId)}"><i data-lucide="rotate-ccw"></i> ${escapeHtml(turn.revertLabel || 'Revert')}</button>` : ''}
+                  <button type="button" class="turn-file-btn" data-turn-action="restore-cp" data-cp-id="${escapeHtml(turn.checkpointId)}">Restore</button>
+                </div>
+              </div>`
+            : ''}
+        </section>`
+      : '';
+
+    bodyEl.innerHTML = `
+      ${turn.prompt ? `<div class="activity-prompt-quote">${escapeHtml(turn.prompt)}</div>` : ''}
+      <section class="activity-section">
+        <div class="activity-section-head">
+          <span>Execution Steps</span>
+          <span class="tabular-nums">${(turn.steps || []).length}</span>
+        </div>
+        <div class="activity-steps-list">${stepsHtml}</div>
+      </section>
+      ${subAgentsHtml}
+      ${webHtml}
+      ${reasoningHtml}
+      ${filesHtml}
+    `;
+
+    this._bindChatMessageActions(bodyEl);
+    this._safeCreateIcons(document.getElementById('agentActivityDrawer'));
+  }
+
   _bindChatMessageActions(root) {
     if (!root) return;
+    root.querySelectorAll('[data-open-activity-turn]').forEach((btn) => {
+      if (btn.dataset.bound) return;
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', () => {
+        this.openActivityDrawer(btn.dataset.openActivityTurn, btn.dataset.activityJson || '');
+      });
+    });
     root.querySelectorAll('[data-turn-action]').forEach((btn) => {
       if (btn.dataset.bound) return;
       btn.dataset.bound = '1';
       btn.addEventListener('click', () => {
         const action = btn.dataset.turnAction;
-        const filePath = btn.closest('[data-file-path]')?.dataset.filePath;
-        if (action === 'open' && filePath) this.openFile(filePath, true);
-        else if (action === 'diff' && filePath) this.openFileInDiff(filePath, btn.dataset.cpId || 'latest');
-        else if (action === 'restore-cp' && btn.dataset.cpId) this.restoreCheckpoint(btn.dataset.cpId);
-        else if (action === 'revert-before-cp' && btn.dataset.cpId) this.revertToBeforeCheckpoint(btn.dataset.cpId);
+        const filePath = btn.dataset.filePath || btn.closest('[data-file-path]')?.dataset.filePath;
+        if (action === 'open' && filePath) {
+          this.closeActivityDrawer();
+          this.openFile(filePath, true);
+        } else if (action === 'diff' && filePath) {
+          this.closeActivityDrawer();
+          this.openFileInDiff(filePath, btn.dataset.cpId || 'latest');
+        } else if (action === 'restore-cp' && btn.dataset.cpId) {
+          this.restoreCheckpoint(btn.dataset.cpId);
+        } else if (action === 'revert-before-cp' && btn.dataset.cpId) {
+          this.revertToBeforeCheckpoint(btn.dataset.cpId);
+        }
       });
     });
     root.querySelectorAll('[data-copy-msg-id]').forEach((btn) => {
@@ -3345,6 +4015,17 @@ export class WebForgeStudio {
       if (title && title.textContent !== 'App ready') title.textContent = 'Interrupted session';
       const ind = card.querySelector('.agent-status-indicator');
       if (ind) ind.classList.remove('running');
+    });
+    root.querySelectorAll('.lovable-activity-card.status-running').forEach((card) => {
+      card.classList.remove('status-running');
+      card.classList.add('status-stopped');
+      const hl = card.querySelector('.lovable-activity-headline');
+      if (hl) {
+        hl.classList.remove('kokonut-shimmer');
+        hl.textContent = 'Interrupted session';
+      }
+      const sp = card.querySelector('.lovable-spinner');
+      if (sp) sp.classList.add('is-stopped');
     });
   }
 
@@ -3416,13 +4097,22 @@ export class WebForgeStudio {
     document.getElementById('btnRetryGen')?.classList.toggle('hidden', !show);
   }
 
-  _updateStatusBar({ tokens, time, done }) {
+  _updateStatusBar({ tokens, time, done, error }) {
     const el = document.getElementById('statusInfo');
     if (!el) return;
-    const icon = done
-      ? '<i data-lucide="check-circle-2"></i>'
-      : '<i data-lucide="loader-2" class="lucide-spin"></i>';
-    el.innerHTML = `${icon}<span class="tabular-nums">${tokens || 0}t · ${time || 0}s</span>`;
+    if (error) {
+      el.classList.remove('hidden');
+      el.innerHTML = `<i data-lucide="alert-circle"></i><span>${this._esc(String(error))}</span>`;
+      this._safeCreateIcons(el);
+      return;
+    }
+    if (done) {
+      el.classList.add('hidden');
+      el.textContent = '';
+      return;
+    }
+    el.classList.remove('hidden');
+    el.innerHTML = `<i data-lucide="loader-2" class="lucide-spin"></i><span class="tabular-nums">${tokens || 0}t · ${time || 0}s</span>`;
     this._safeCreateIcons(el);
   }
 
@@ -3459,6 +4149,9 @@ export class WebForgeStudio {
     } else if (view === 'diff') {
       this._renderDiffView();
     }
+
+    const seg = previewBtn?.closest('.seg');
+    if (seg) requestAnimationFrame(() => syncSlidingTabIndicator(seg));
   }
 
   _applyLayoutPrefs() {
@@ -3470,6 +4163,7 @@ export class WebForgeStudio {
     if (drawer && this.layoutPrefs.devtoolsHeight) {
       drawer.style.height = `${Math.max(130, Math.min(460, this.layoutPrefs.devtoolsHeight))}px`;
     }
+    this._applyHomeSidebarState();
   }
 
   _setupResizers() {
@@ -3578,7 +4272,7 @@ export class WebForgeStudio {
     if (!modal || !input) return;
     input.value = prefill;
     this._renderCommandPaletteResults(prefill);
-    modal.showModal();
+    openDialogWithOrigin(modal, null, { instant: true });
     requestAnimationFrame(() => input.focus());
   }
 
@@ -3595,10 +4289,11 @@ export class WebForgeStudio {
         { group: 'Actions', label: 'Toggle Dark / Light Theme', hint: 'Appearance', icon: 'sun-moon', run: () => this.toggleTheme() },
         { group: 'Actions', label: `Web Search: ${this.agentPrefs.webSearch ? 'On' : 'Off'} (Toggle)`, hint: 'Free, no key', icon: 'globe', run: () => this.toggleWebSearchPref() },
         { group: 'Actions', label: `Parallel Sub-Agents: ${this.agentPrefs.subAgents ? 'Auto' : 'Off'} (Toggle)`, hint: 'Multi-agent', icon: 'git-fork', run: () => this.toggleSubAgentsPref() },
-        { group: 'Actions', label: 'Open UI Component Library Studio', hint: '6 style packs & imports', icon: 'blocks', run: () => this.uiLibraryModal.open() },
-        { group: 'Actions', label: 'Open System Instructions & Skills', hint: 'Prompt & GitHub Import', icon: 'sliders-horizontal', run: () => this.openSystemDrawer() },
-        { group: 'Actions', label: 'Open Provider & Model Settings', hint: 'API / Local LLM', icon: 'settings', run: () => document.getElementById('settingsModal')?.showModal() },
-        { group: 'Actions', label: 'Open Prompt Builder Wizard', hint: '7-step builder', icon: 'wand-sparkles', run: () => this.openPromptBuilderModal() }
+        { group: 'Actions', label: 'Open UI Component Library Studio', hint: 'DESIGN.md & GitHub libs', icon: 'blocks', run: () => this.uiLibraryModal.open() },
+        { group: 'Actions', label: 'Open System instructions', hint: 'Settings', icon: 'sliders-horizontal', run: () => this.settingsView.open('system-instructions') },
+        { group: 'Actions', label: 'Open Model provider settings', hint: 'API / Local LLM', icon: 'cpu', run: () => this.settingsView.open('model-provider') },
+        { group: 'Actions', label: 'Open Settings', hint: 'Ctrl+,', icon: 'settings', run: () => this.settingsView.open() },
+        { group: 'Actions', label: 'Open Prompt builder', hint: '7-step builder', icon: 'wand-sparkles', run: () => this.openPromptBuilderModal() }
       );
       if (this.activeProjectId) {
         commands.push(
@@ -3696,15 +4391,24 @@ export class WebForgeStudio {
     });
     document.getElementById('modalTemperature')?.addEventListener('input', (e) => {
       const val = parseFloat(e.target.value);
-      if (Number.isFinite(val)) this.provider.configure({ temperature: val });
+      if (Number.isFinite(val)) {
+        this.provider.configure({ temperature: val });
+        this._updateSettingsParamsSummary();
+      }
     });
     document.getElementById('modalTopP')?.addEventListener('input', (e) => {
       const val = parseFloat(e.target.value);
-      if (Number.isFinite(val)) this.provider.configure({ topP: val });
+      if (Number.isFinite(val)) {
+        this.provider.configure({ topP: val });
+        this._updateSettingsParamsSummary();
+      }
     });
     document.getElementById('modalMaxTokens')?.addEventListener('input', (e) => {
       const val = parseInt(e.target.value, 10);
-      if (Number.isFinite(val) && val > 0) this.provider.configure({ maxTokens: val });
+      if (Number.isFinite(val) && val > 0) {
+        this.provider.configure({ maxTokens: val });
+        this._updateSettingsParamsSummary();
+      }
     });
     document.getElementById('modalContextWindow')?.addEventListener('input', (e) => {
       const val = parseInt(e.target.value, 10);
@@ -3712,10 +4416,12 @@ export class WebForgeStudio {
         this.provider.configure({ contextWindow: val });
         this._updateContextBudgetMeter();
         this._updateHomeStatusStrip();
+        this._updateSettingsParamsSummary();
       }
     });
 
     this._wireModelCombobox();
+    this._wireSettingsTabs();
 
     const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
     setVal('modalProviderType', this.provider.type);
@@ -3727,6 +4433,40 @@ export class WebForgeStudio {
     setVal('modalContextWindow', this.provider.contextWindow || 32768);
     this._updateModalProviderFields();
     this._populateModelSelect();
+    this._updateSettingsParamsSummary();
+  }
+
+  _wireSettingsTabs() {
+    document.querySelectorAll('[data-settings-tab]').forEach((tabBtn) => {
+      tabBtn.addEventListener('click', () => {
+        this.switchSettingsTab(tabBtn.dataset.settingsTab);
+      });
+    });
+  }
+
+  switchSettingsTab(tabName = 'model') {
+    document.querySelectorAll('[data-settings-tab]').forEach((btn) => {
+      const active = btn.dataset.settingsTab === tabName;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    document.querySelectorAll('[data-settings-panel]').forEach((panel) => {
+      const active = panel.dataset.settingsPanel === tabName;
+      panel.classList.toggle('active', active);
+      panel.hidden = !active;
+    });
+    const tabsEl = document.querySelector('.settings-tabs');
+    if (tabsEl) requestAnimationFrame(() => syncSlidingTabIndicator(tabsEl));
+  }
+
+  _updateSettingsParamsSummary() {
+    const el = document.getElementById('settingsParamsSummary');
+    if (!el) return;
+    const temp = this.provider.temperature ?? 0.7;
+    const topP = this.provider.topP ?? 0.95;
+    const maxTok = Math.round((this.provider.maxTokens || 16384) / 1024);
+    const ctx = Math.round((this.provider.contextWindow || 32768) / 1024);
+    el.textContent = `${temp} · ${topP} top-p · ${maxTok}k out · ${ctx}k ctx`;
   }
 
   _updateModalProviderFields() {
@@ -3853,6 +4593,7 @@ export class WebForgeStudio {
         });
         const cwEl = document.getElementById('modalContextWindow');
         if (cwEl) cwEl.value = this.provider.contextWindow;
+        this._updateSettingsParamsSummary();
         this._syncModelComboboxLabel();
         this._setModelPanelOpen(false);
         this._renderModelComboboxList();
@@ -3876,43 +4617,81 @@ export class WebForgeStudio {
   async testConnection() {
     const btn = document.getElementById('btnTestConnection');
     if (!btn) return;
+    const labelSpan = btn.querySelector('span');
+    const setBtnLabel = (txt) => { if (labelSpan) labelSpan.textContent = txt; else btn.textContent = txt; };
     btn.disabled = true;
-    btn.textContent = 'Testing…';
+    setBtnLabel('Testing…');
     this.provider.configure({
       type: document.getElementById('modalProviderType')?.value,
       apiKey: document.getElementById('modalApiKey')?.value,
       baseUrl: document.getElementById('modalBaseUrl')?.value,
     });
+    this._updateAiConnectBridge('connecting', 'Handshaking with provider…');
     const result = await this.provider.testConnection();
     btn.disabled = false;
     if (result.ok) {
-      btn.textContent = `Connected (${result.models})`;
+      setBtnLabel(`Connected (${result.models})`);
       this._populateModelSelect();
       this._updateConnectionStatus();
       this._updateHomeStatusStrip();
-      setTimeout(() => { btn.textContent = 'Test Connect'; }, 2800);
+      this._updateAiConnectBridge('connected', `${result.models} models available`);
+      setTimeout(() => { setBtnLabel('Test Connect'); }, 2800);
     } else {
-      btn.textContent = 'Failed';
+      setBtnLabel('Failed');
+      this._updateAiConnectBridge('error', result.error || 'Connection failed');
       this.showToast(result.error, true);
-      setTimeout(() => { btn.textContent = 'Test Connect'; }, 2800);
+      setTimeout(() => { setBtnLabel('Test Connect'); }, 2800);
     }
   }
 
   async fetchModels() {
+    this._updateAiConnectBridge('connecting', 'Fetching model catalog…');
     try {
       await this.provider.fetchModels();
       this._populateModelSelect();
       this._updateConnectionStatus();
       this._updateHomeStatusStrip();
+      this._updateAiConnectBridge('connected', `${this.provider.models.length} models ready`);
       this.showToast(`Loaded ${this.provider.models.length} models`);
     } catch (e) {
+      this._updateAiConnectBridge('error', e.message || 'Could not load models');
       this.showToast(e.message, true);
+    }
+  }
+
+  _updateAiConnectBridge(forcedState = null, detailText = '') {
+    const bridge = document.getElementById('wfAiConnectBridge');
+    if (!bridge) return;
+    const state = forcedState || (this.provider.connected ? 'connected' : 'idle');
+    bridge.dataset.state = state;
+
+    const providerLabel = PROVIDER_PRESETS[this.provider.type]?.name || 'Provider';
+    const targetNameEl = document.getElementById('wfBridgeTargetName');
+    const statusTextEl = document.getElementById('wfBridgeStatusText');
+    if (targetNameEl) targetNameEl.textContent = providerLabel;
+
+    if (statusTextEl) {
+      if (detailText) {
+        statusTextEl.textContent = detailText;
+      } else if (state === 'connected') {
+        const shortModel = (this.provider.model || '').split('/').pop() || providerLabel;
+        statusTextEl.textContent = `Connected · ${shortModel}`;
+      } else if (state === 'connecting') {
+        statusTextEl.textContent = `Connecting to ${providerLabel}…`;
+      } else if (state === 'error') {
+        statusTextEl.textContent = `Unable to reach ${providerLabel}`;
+      } else {
+        statusTextEl.textContent = this.provider.model
+          ? (this.provider.model || '').split('/').pop()
+          : `Click Test Connect or Load Models to link ${providerLabel}`;
+      }
     }
   }
 
   _updateConnectionStatus() {
     const dot = document.querySelector('.project-name .dot');
     if (dot) dot.style.background = this.provider.connected ? 'var(--md-success)' : 'var(--md-text-dim)';
+    this._updateAiConnectBridge();
   }
 
   _updateProviderUI() {
@@ -3920,15 +4699,18 @@ export class WebForgeStudio {
     this.provider.models = [];
     this.provider.connected = false;
     this._populateModelSelect();
+    this._updateAiConnectBridge('idle');
   }
 
   // ── Skills UI ──
 
   _renderSkillsIndicator() {
     this._syncPopoverSkillCounts();
+    const enabled = this.skillManager.getActiveCount();
+    const tabCount = document.getElementById('settingsSkillsTabCount');
+    if (tabCount) tabCount.textContent = String(enabled);
     const container = document.getElementById('skillsIndicatorRow');
     if (!container) return;
-    const enabled = this.skillManager.getActiveCount();
     container.classList.toggle('open', this.skillsDockOpen);
     container.innerHTML = `
       <button type="button" class="skills-launcher" id="btnToggleSkillsDock" aria-expanded="${this.skillsDockOpen}">
@@ -3974,38 +4756,47 @@ export class WebForgeStudio {
   _renderSkillsSettingsList() {
     const list = document.getElementById('skillsList');
     if (!list) return;
-    list.innerHTML = this.skillManager.skills.map((s) => {
+    list.innerHTML = this.skillManager.skills.map((s, idx) => {
       const safeId = escapeHtml(s.id);
       const safeName = escapeHtml(s.name);
+      const staggerMs = computeStaggerDelayMs(idx, { stepMs: 28, maxTotalMs: 240 });
+      const repoLabel = s.source
+        ? String(s.source).replace(/^https?:\/\/(?:www\.)?github\.com\//i, '').replace(/\/blob\/.*$/, '')
+        : '';
+      const repoLink = s.source && /^https?:\/\//i.test(s.source)
+        ? `<span class="skill-meta-sep" aria-hidden="true">·</span><a class="skill-source-link" href="${escapeHtml(s.source)}" target="_blank" rel="noopener noreferrer">${escapeHtml(repoLabel || 'GitHub')}</a>`
+        : '';
       return `
-        <div class="skill-card" data-skill-id="${safeId}">
-          <div class="skill-card-header">
-            <span class="skill-name">${safeName}</span>
-            <input type="checkbox" class="m3-switch" data-action="toggle-skill" ${s.enabled ? 'checked' : ''} aria-label="Toggle ${safeName}">
+        <div class="skill-row wf-stagger-in" data-skill-id="${safeId}" style="--wf-stagger:${staggerMs}ms">
+          <div class="skill-row-copy">
+            <div class="skill-name-line">
+              <span class="skill-name">${safeName}</span>${repoLink}
+            </div>
+            <span class="skill-card-desc">${escapeHtml(s.description)}</span>
           </div>
-          <div class="skill-card-desc">${escapeHtml(s.description)}</div>
-          <div class="skill-card-actions">
-            <button type="button" class="btn btn-outline btn-sm" data-action="view-skill">Prompt</button>
-            ${!s.builtin ? `<button type="button" class="btn btn-outline btn-sm" data-action="delete-skill">Delete</button>` : ''}
+          <div class="skill-row-controls">
+            <button type="button" class="skill-link-btn" data-action="view-skill">Prompt</button>
+            ${!s.builtin ? `<button type="button" class="skill-link-btn danger" data-action="delete-skill">Delete</button>` : ''}
+            <input type="checkbox" class="m3-switch m3-switch-sm" data-action="toggle-skill" ${s.enabled ? 'checked' : ''} aria-label="Toggle ${safeName}">
           </div>
         </div>`;
     }).join('');
 
-    list.querySelectorAll('.skill-card').forEach((card) => {
-      const id = card.dataset.skillId;
-      card.querySelector('[data-action="toggle-skill"]')?.addEventListener('change', () => {
+    list.querySelectorAll('.skill-row').forEach((row) => {
+      const id = row.dataset.skillId;
+      row.querySelector('[data-action="toggle-skill"]')?.addEventListener('change', () => {
         this.skillManager.toggle(id);
         this._renderSkillsIndicator();
         this._updateContextBudgetMeter();
       });
-      card.querySelector('[data-action="view-skill"]')?.addEventListener('click', () => {
+      row.querySelector('[data-action="view-skill"]')?.addEventListener('click', (e) => {
         const sk = this.skillManager.skills.find((x) => x.id === id);
         if (!sk) return;
         const area = document.getElementById('skillPromptPreview');
         if (area) area.value = sk.prompt;
-        document.getElementById('skillPromptModal')?.showModal();
+        openDialogWithOrigin(document.getElementById('skillPromptModal'), e.currentTarget);
       });
-      card.querySelector('[data-action="delete-skill"]')?.addEventListener('click', async () => {
+      row.querySelector('[data-action="delete-skill"]')?.addEventListener('click', async () => {
         const sk = this.skillManager.skills.find((x) => x.id === id);
         if (!sk) return;
         const ok = await this.openAppPromptModal({
@@ -4051,7 +4842,7 @@ export class WebForgeStudio {
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = '<i data-lucide="globe"></i> Test Web Search';
+        btn.innerHTML = '<i data-lucide="globe"></i><span>Test Search</span>';
         this._safeCreateIcons(btn);
       }
     }
@@ -4166,7 +4957,17 @@ export class WebForgeStudio {
   exportAsZip() {
     if (!Object.keys(this.VFS).length) return this.showToast('Nothing to export', true);
     const proj = this._getActiveProject();
-    const { safeSlug, files } = buildProjectExportFiles(proj?.name, this.VFS, this.preview.getStandaloneTemplate(this.VFS));
+    const attachedManifests = [
+      ...(Array.isArray(proj?.attachedManifests) ? proj.attachedManifests : []),
+      ...(Array.isArray(this.wsComponentAttachments) ? this.wsComponentAttachments.map((a) => a.manifest).filter(Boolean) : []),
+      ...(Array.isArray(this.homeComponentAttachments) ? this.homeComponentAttachments.map((a) => a.manifest).filter(Boolean) : []),
+    ];
+    const { safeSlug, files } = buildProjectExportFiles(
+      proj?.name,
+      this.VFS,
+      this.preview.getStandaloneTemplate(this.VFS),
+      { attachedManifests }
+    );
     downloadBlob(createZipBlob(files), `${safeSlug}.zip`);
     this.showToast(`Downloaded ${safeSlug}.zip`);
   }
@@ -4200,12 +5001,19 @@ export class WebForgeStudio {
     }
   }
 
-  openPromptBuilderModal() {
+  openPromptBuilderModal(triggerEl = null) {
     const modal = document.getElementById('promptBuilderModal');
     if (!modal) return;
-    modal.showModal();
+    if (!modal.hasAttribute('tabindex')) modal.setAttribute('tabindex', '-1');
+    openDialogWithOrigin(modal, triggerEl);
+    try { modal.focus({ preventScroll: true }); } catch {}
+    this.promptBuilder.syncStudioState();
     this.promptBuilder.showStep(this.promptBuilder.currentStep || 1);
     this.promptBuilder.renderProgress();
+  }
+
+  openSettingsModal(_triggerEl = null, pageId = null) {
+    this.settingsView?.open(pageId || null);
   }
 
   openAppPromptModal({ title = 'Confirm', message = '', showInput = false, inputValue = '', placeholder = '', confirmText = 'Confirm', danger = false } = {}) {
@@ -4283,10 +5091,13 @@ export class WebForgeStudio {
       btn.addEventListener('click', () => this.toggleTheme());
     });
 
-    // Mobile drawer on Home
+    // Desktop collapsible sidebar & mobile drawer on Home
     document.getElementById('btnHomeNavToggle')?.addEventListener('click', () => this.setHomeDrawerOpen(true));
     document.getElementById('homeSidebarBackdrop')?.addEventListener('click', () => this.setHomeDrawerOpen(false));
     document.getElementById('btnCloseHomeDrawer')?.addEventListener('click', () => this.setHomeDrawerOpen(false));
+    document.getElementById('btnCollapseHomeSidebar')?.addEventListener('click', () => this.toggleHomeSidebar(true));
+    document.getElementById('btnExpandHomeSidebar')?.addEventListener('click', () => this.toggleHomeSidebar(false));
+    document.getElementById('btnCloseActivityDrawer')?.addEventListener('click', () => this.closeActivityDrawer());
 
     // Home actions
     document.getElementById('homeSendBtn')?.addEventListener('click', () => this.sendHomePrompt());
@@ -4302,30 +5113,46 @@ export class WebForgeStudio {
       this.homeSearchQuery = e.target.value;
       this._renderHomeProjects();
     });
-    document.getElementById('homeModelBtn')?.addEventListener('click', () => document.getElementById('settingsModal')?.showModal());
-    document.getElementById('homeComposerModelBtn')?.addEventListener('click', () => document.getElementById('settingsModal')?.showModal());
+    document.getElementById('homeModelBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleHomeModelPopover();
+    });
+    document.getElementById('btnHomeManageProviders')?.addEventListener('click', () => {
+      this.toggleHomeModelPopover(false);
+      this.settingsView.open('model-provider');
+    });
     document.getElementById('btnHeroUiCatalog')?.addEventListener('click', () => this.uiLibraryModal.open('awesome-components'));
     document.getElementById('btnHomeQuickUiLib')?.addEventListener('click', () => this.uiLibraryModal.open());
     document.getElementById('btnHomeQuickGithub')?.addEventListener('click', () => this.uiLibraryModal.open(null, 'github'));
     document.getElementById('btnHomePlanToggle')?.addEventListener('click', () => this.togglePlanMode());
     document.getElementById('btnWsPlanToggle')?.addEventListener('click', () => this.togglePlanMode());
-    document.getElementById('btnNewProjectHome')?.addEventListener('click', () => this.createNewProject());
-    document.getElementById('btnNewProjectHomeGrid')?.addEventListener('click', () => this.createNewProject());
-    document.getElementById('btnOpenSettingsHome')?.addEventListener('click', () => document.getElementById('settingsModal')?.showModal());
-    document.getElementById('btnOpenSystemDrawerHome')?.addEventListener('click', () => this.openSystemDrawer());
-    document.getElementById('btnOpenCommandHome')?.addEventListener('click', () => this.openCommandPalette(''));
-    document.getElementById('btnOpenPromptBuilderHome')?.addEventListener('click', () => this.openPromptBuilderModal());
-    document.getElementById('btnOpenPromptBuilderHomeSidebar')?.addEventListener('click', () => {
+    document.getElementById('btnNewProjectHome')?.addEventListener('click', () => {
       this.setHomeDrawerOpen(false);
-      this.openPromptBuilderModal();
+      this.createNewProject();
+    });
+    document.getElementById('btnOpenSettingsHome')?.addEventListener('click', () => {
+      this.setHomeDrawerOpen(false);
+      this.settingsView.open();
+    });
+    document.getElementById('btnOpenCommandHome')?.addEventListener('click', () => {
+      this.toggleComposerToolsMenu('home', false);
+      this.openCommandPalette('');
+    });
+    document.getElementById('btnOpenPromptBuilderHome')?.addEventListener('click', (e) => this.openPromptBuilderModal(e.currentTarget));
+    document.getElementById('btnOpenPromptBuilderHomeSidebar')?.addEventListener('click', (e) => {
+      this.setHomeDrawerOpen(false);
+      this.openPromptBuilderModal(e.currentTarget);
     });
     document.getElementById('btnOpenUiLibraryHomeSidebar')?.addEventListener('click', () => {
       this.setHomeDrawerOpen(false);
       this.uiLibraryModal.open();
     });
 
-    // Workspace Top Bar
-    document.getElementById('btnBackHome')?.addEventListener('click', () => this.showHomeView());
+    // Workspace Top Bar & Tier 3 More Menus
+    document.getElementById('btnBackHome')?.addEventListener('click', () => {
+      this.closeActivityDrawer();
+      this.showHomeView();
+    });
     document.getElementById('projectNameBtn')?.addEventListener('click', () => this.toggleProjectDropdown());
     document.getElementById('btnNewProjectDropdown')?.addEventListener('click', () => {
       this.createNewProject();
@@ -4333,11 +5160,39 @@ export class WebForgeStudio {
     });
     document.getElementById('btnOpenUiLibraryTopbar')?.addEventListener('click', () => this.uiLibraryModal.open());
     document.getElementById('btnCheckpointsModal')?.addEventListener('click', () => this.openCheckpointsModal());
-    document.getElementById('btnCommandPalette')?.addEventListener('click', () => this.openCommandPalette(''));
-    document.getElementById('btnOpenSystemDrawer')?.addEventListener('click', () => this.openSystemDrawer());
-    document.getElementById('btnOpenSettings')?.addEventListener('click', () => document.getElementById('settingsModal')?.showModal());
+    document.getElementById('btnCommandPalette')?.addEventListener('click', () => {
+      this.toggleToolbarMoreMenu('topbar', false);
+      this.openCommandPalette('');
+    });
+    document.getElementById('btnOpenSettings')?.addEventListener('click', () => {
+      this.toggleToolbarMoreMenu('topbar', false);
+      this.settingsView.open();
+    });
     document.getElementById('btnExportZip')?.addEventListener('click', () => this.exportAsZip());
-    document.getElementById('btnExportHtml')?.addEventListener('click', () => this.exportAsHTML());
+    document.getElementById('btnExportHtml')?.addEventListener('click', () => {
+      this.toggleToolbarMoreMenu('ws', false);
+      this.exportAsHTML();
+    });
+    document.getElementById('btnTopbarMore')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleToolbarMoreMenu('ws', false);
+      this.toggleToolbarMoreMenu('topbar');
+    });
+    document.getElementById('btnWsToolbarMore')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleToolbarMoreMenu('topbar', false);
+      this.toggleToolbarMoreMenu('ws');
+    });
+    document.getElementById('topbarMoreMenu')?.addEventListener('click', (e) => {
+      if (e.target.closest('[data-theme-toggle]')) {
+        this.toggleToolbarMoreMenu('topbar', false);
+      }
+    });
+    document.getElementById('wsToolbarMoreMenu')?.addEventListener('click', (e) => {
+      if (e.target.closest('#btnRefreshPreview, #btnNewTabPreview')) {
+        this.toggleToolbarMoreMenu('ws', false);
+      }
+    });
 
     document.addEventListener('click', (e) => {
       const dd = document.getElementById('projectDropdown');
@@ -4347,7 +5202,11 @@ export class WebForgeStudio {
       }
       const ctxWrap = document.getElementById('contextBudgetWrap');
       if (ctxWrap && !ctxWrap.contains(e.target)) {
-        document.getElementById('contextBudgetPopover')?.classList.add('hidden');
+        ctxWrap.classList.remove('is-open');
+      }
+      const homeRingWrap = document.getElementById('homeTokenRingWrap');
+      if (homeRingWrap && !homeRingWrap.contains(e.target)) {
+        homeRingWrap.classList.remove('is-open');
       }
       const homeTools = document.getElementById('homeToolsWrap');
       if (homeTools && !homeTools.contains(e.target)) {
@@ -4357,12 +5216,51 @@ export class WebForgeStudio {
       if (wsTools && !wsTools.contains(e.target)) {
         this.toggleComposerToolsMenu('ws', false);
       }
+      const topbarMore = document.getElementById('topbarMoreWrap');
+      if (topbarMore && !topbarMore.contains(e.target)) {
+        this.toggleToolbarMoreMenu('topbar', false);
+      }
+      const wsMore = document.getElementById('wsToolbarMoreWrap');
+      if (wsMore && !wsMore.contains(e.target)) {
+        this.toggleToolbarMoreMenu('ws', false);
+      }
+      const homeModelWrap = document.getElementById('homeModelWrap');
+      if (homeModelWrap && !homeModelWrap.contains(e.target)) {
+        this.toggleHomeModelPopover(false);
+      }
     });
 
     document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === ',' && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        this.toggleHomeModelPopover(false);
+        this.settingsView.open();
+        return;
+      }
       if (e.key === 'Escape') {
+        const pop = document.getElementById('homeModelPopover');
+        if (pop && !pop.hidden) {
+          this.toggleHomeModelPopover(false);
+          return;
+        }
         this.toggleComposerToolsMenu('home', false);
         this.toggleComposerToolsMenu('ws', false);
+        this.toggleToolbarMoreMenu('topbar', false);
+        this.toggleToolbarMoreMenu('ws', false);
+        document.getElementById('homeTokenRingWrap')?.classList.remove('is-open');
+        document.getElementById('contextBudgetWrap')?.classList.remove('is-open');
+        if (this._openActivityTurnId) this.closeActivityDrawer();
+        if (this.settingsView?.isOpen && !document.querySelector('dialog[open]')) {
+          this.settingsView.close();
+          return;
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b' && !e.shiftKey && !e.altKey) {
+        const homeView = document.getElementById('homeView');
+        if (homeView && homeView.style.display !== 'none' && window.innerWidth > 900) {
+          e.preventDefault();
+          this.toggleHomeSidebar();
+        }
       }
     });
 
@@ -4390,11 +5288,15 @@ export class WebForgeStudio {
       this.triggerAutoFix();
     });
     document.getElementById('btnRetryGen')?.addEventListener('click', () => this.retryLastGeneration());
-    document.getElementById('btnWsPromptBuilder')?.addEventListener('click', () => this.openPromptBuilderModal());
+    document.getElementById('btnWsPromptBuilder')?.addEventListener('click', (e) => this.openPromptBuilderModal(e.currentTarget));
     document.getElementById('btnClearSelectedEl')?.addEventListener('click', () => this.preview.clearSelectedElement());
+    document.getElementById('homeTokenRingBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('homeTokenRingWrap')?.classList.toggle('is-open');
+    });
     document.getElementById('contextBudgetMeter')?.addEventListener('click', (e) => {
       e.stopPropagation();
-      document.getElementById('contextBudgetPopover')?.classList.toggle('hidden');
+      document.getElementById('contextBudgetWrap')?.classList.toggle('is-open');
     });
 
     // Stage Toolbar
@@ -4403,13 +5305,22 @@ export class WebForgeStudio {
     document.getElementById('btnViewDiff')?.addEventListener('click', () => this.switchWorkspaceView('diff'));
     document.getElementById('btnInspectPreview')?.addEventListener('click', () => {
       const active = this.preview.toggleInspectMode();
-      this.showToast(active ? 'Inspect mode active — click an element in preview' : 'Inspect mode off');
+      this.showToast(active ? 'Inspect mode active — click an element in preview to edit or swap' : 'Inspect mode off');
+    });
+    document.getElementById('btnSwapSection')?.addEventListener('click', (e) => {
+      this.sectionSwapModal.open({ triggerEl: e.currentTarget });
     });
     document.getElementById('btnRefreshPreview')?.addEventListener('click', () => this.preview.refresh());
     document.getElementById('btnNewTabPreview')?.addEventListener('click', () => this.preview.openInNewTab());
     document.getElementById('btnToggleDevtools')?.addEventListener('click', () => this.toggleDevtools());
 
     // Element Tooltip
+    document.getElementById('btnTooltipSwapLibrary')?.addEventListener('click', (e) => {
+      const sel = this.preview.selectedElement ? { ...this.preview.selectedElement } : null;
+      this.preview.tooltip?.classList.remove('visible');
+      if (this.preview.inspectMode) this.preview.toggleInspectMode(false);
+      this.sectionSwapModal.open({ inspectedElement: sel, triggerEl: e.currentTarget });
+    });
     document.getElementById('btnEditSelectedEl')?.addEventListener('click', () => this.editSelectedElement());
     document.getElementById('btnDismissSelectedEl')?.addEventListener('click', () => this.preview.clearSelectedElement());
 
@@ -4475,7 +5386,7 @@ export class WebForgeStudio {
       if (e.key === 'Enter') { e.preventDefault(); this.createManualCheckpoint(); }
     });
 
-    // Composer Controls Popovers (Web Search, Sub-Agents, System)
+    // Composer Controls Popovers (Model, Web Search, Sub-Agents, System)
     document.getElementById('btnHomeToolsMenu')?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.toggleComposerToolsMenu('home');
@@ -4484,17 +5395,25 @@ export class WebForgeStudio {
       e.stopPropagation();
       this.toggleComposerToolsMenu('ws');
     });
+    document.getElementById('btnHomePopoverModel')?.addEventListener('click', () => {
+      this.toggleComposerToolsMenu('home', false);
+      this.settingsView.open('model-provider');
+    });
+    document.getElementById('btnWsPopoverModel')?.addEventListener('click', () => {
+      this.toggleComposerToolsMenu('ws', false);
+      this.settingsView.open('model-provider');
+    });
     document.getElementById('toggleHomeWebSearch')?.addEventListener('change', (e) => this.toggleWebSearchPref(e.target.checked));
     document.getElementById('toggleWsWebSearch')?.addEventListener('change', (e) => this.toggleWebSearchPref(e.target.checked));
     document.getElementById('toggleHomeSubAgents')?.addEventListener('change', (e) => this.toggleSubAgentsPref(e.target.checked));
     document.getElementById('toggleWsSubAgents')?.addEventListener('change', (e) => this.toggleSubAgentsPref(e.target.checked));
     document.getElementById('btnHomePopoverUiLibrary')?.addEventListener('click', () => {
       this.toggleComposerToolsMenu('home', false);
-      this.uiLibraryModal.open();
+      this.uiLibraryModal.open(null, null, { mode: 'attach-chat', chatTarget: 'home' });
     });
     document.getElementById('btnWsPopoverUiLibrary')?.addEventListener('click', () => {
       this.toggleComposerToolsMenu('ws', false);
-      this.uiLibraryModal.open();
+      this.uiLibraryModal.open(null, null, { mode: 'attach-chat', chatTarget: 'ws' });
     });
     document.getElementById('btnHomePopoverSystem')?.addEventListener('click', () => {
       this.toggleComposerToolsMenu('home', false);
@@ -4533,12 +5452,12 @@ export class WebForgeStudio {
     });
     document.getElementById('btnSaveCustomSkill')?.addEventListener('click', () => this.importTextSkill());
 
-    // Backdrop dismiss on all dialogs
+    // Backdrop dismiss on all dialogs (Principle 18: fast close faster than open)
     document.querySelectorAll('dialog').forEach((d) => {
       d.addEventListener('click', (e) => {
         if (e.target === d) {
           if (d.id === 'appPromptModal') this.closeAppPromptModal(null);
-          else d.close();
+          else closeDialogFast(d);
         }
       });
     });
